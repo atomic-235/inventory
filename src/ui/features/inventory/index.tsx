@@ -1,7 +1,8 @@
-import { useState } from 'preact/hooks';
+import { useState, useRef } from 'preact/hooks';
+import type { JSX } from 'preact';
 import { useItems, items } from '../../useItems';
 import { db } from '../../../db';
-import { useMeta } from '../../useMeta';
+import { useMeta, meta } from '../../useMeta';
 import { captureFrame } from '../../../data/camera';
 import { extractItem } from '../../../data/vision';
 import { itemsToCsv } from '../../../domain/csv';
@@ -264,6 +265,8 @@ export default function InventoryView() {
   const [flowError, setFlowError] = useState<string | null>(null);
   const [notice, setNotice] = useState<string | null>(null);
   const [formError, setFormError] = useState<string | null>(null);
+  const [importError, setImportError] = useState<string | null>(null);
+  const fileRef = useRef<HTMLInputElement>(null);
 
   const filtered = list.filter((i) => matches(i, query));
   const suggestions = buildAutocomplete(list, {
@@ -355,6 +358,24 @@ export default function InventoryView() {
     URL.revokeObjectURL(url);
   }
 
+  async function onImportFile(e: JSX.TargetedEvent<HTMLInputElement, Event>) {
+    setImportError(null);
+    const file = e.currentTarget.files?.[0];
+    if (!file) return;
+    try {
+      const bytes = new Uint8Array(await file.arrayBuffer());
+      await db.importDatabase(bytes);
+      await items.refresh();
+      await meta.refresh();
+      setNotice('Imported');
+      window.setTimeout(() => setNotice(null), 2000);
+    } catch (err) {
+      setImportError(err instanceof Error ? err.message : String(err));
+    } finally {
+      e.currentTarget.value = '';
+    }
+  }
+
   return (
     <section id="inventory">
       <h2>Items</h2>
@@ -383,7 +404,20 @@ export default function InventoryView() {
         <button onClick={onExportDb} disabled={list.length === 0}>
           Export SQLite
         </button>
+
+        <button onClick={() => fileRef.current?.click()}>
+          Import SQLite
+        </button>
+        <input
+          ref={fileRef}
+          type="file"
+          accept=".sqlite,.sqlite3,.db"
+          style="display:none"
+          onChange={onImportFile}
+        />
       </div>
+
+      {importError ? <p role="alert">{importError}</p> : null}
 
       {flowError ? <p role="alert">{flowError}</p> : null}
 

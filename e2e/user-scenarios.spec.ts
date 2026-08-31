@@ -116,3 +116,46 @@ test('exports a valid SQLite database file', async ({ page }) => {
   expect(buf.subarray(0, 16).toString('ascii')).toBe('SQLite format 3\u0000');
   expect(buf.toString('utf8')).toContain('Lamp');
 });
+
+// S7 — round-trip: export a snapshot, drift the DB, then import the snapshot to restore it.
+test('imports a SQLite file, replacing current data', async ({ page }) => {
+  await page.goto('/');
+  await seed(page, { name: 'Alpha', category: 'Furniture' });
+  await seed(page, { name: 'Beta', category: 'Furniture' });
+  await page.reload();
+
+  const downloadPromise = page.waitForEvent('download');
+  await page.getByRole('button', { name: 'Export SQLite' }).click();
+  const snapshot = readFileSync((await (await downloadPromise).path()) as string);
+
+  await seed(page, { name: 'Gamma', category: 'Furniture' });
+  await page.reload();
+  await expect(page.getByTestId('item-list')).toContainText('Gamma');
+
+  await page.setInputFiles('input[type="file"]', {
+    name: 'backup.sqlite',
+    mimeType: 'application/x-sqlite3',
+    buffer: snapshot,
+  });
+
+  await expect(page.getByRole('status')).toContainText('Imported');
+  await expect(page.getByTestId('item-list')).toContainText('Alpha');
+  await expect(page.getByTestId('item-list')).toContainText('Beta');
+  await expect(page.getByTestId('item-list')).not.toContainText('Gamma');
+});
+
+// S8 — importing a non-SQLite file is rejected with feedback and leaves data intact.
+test('importing a corrupt file is rejected without destroying data', async ({ page }) => {
+  await page.goto('/');
+  await seed(page, { name: 'Keep' });
+  await page.reload();
+
+  await page.setInputFiles('input[type="file"]', {
+    name: 'junk.sqlite',
+    mimeType: 'application/octet-stream',
+    buffer: Buffer.from('this is not a sqlite database'),
+  });
+
+  await expect(page.getByRole('alert')).toBeVisible();
+  await expect(page.getByTestId('item-list')).toContainText('Keep');
+});

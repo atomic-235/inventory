@@ -168,6 +168,53 @@ async function handle(request: Request): Promise<void> {
         break;
       }
 
+      case 'import': {
+        const bytes = request.data;
+        const root = await navigator.storage.getDirectory();
+        const rm = async (name: string) => {
+          try {
+            await root.removeEntry(name);
+          } catch {
+            /* ignore */
+          }
+        };
+
+        const tmpName = 'import-tmp.sqlite';
+        const tmpHandle = await root.getFileHandle(tmpName, { create: true });
+        const tmpWritable = await tmpHandle.createWritable();
+        await tmpWritable.write(bytes);
+        await tmpWritable.close();
+
+        let tmpDb: number | undefined;
+        try {
+          tmpDb = await sqlite3.open_v2(tmpName, undefined, 'opfs');
+          await sqlite3.execWithParams(tmpDb, 'SELECT count(*) FROM sqlite_master');
+        } catch {
+          if (tmpDb !== undefined) await sqlite3.close(tmpDb);
+          await rm(tmpName);
+          await rm(`${tmpName}-journal`);
+          throw new Error('Not a valid SQLite database');
+        }
+        await sqlite3.close(tmpDb);
+        await rm(tmpName);
+        await rm(`${tmpName}-journal`);
+
+        await sqlite3.close(db);
+        await rm('inventory');
+        await rm('inventory-journal');
+        await rm('inventory-wal');
+
+        const mainHandle = await root.getFileHandle('inventory', { create: true });
+        const mainWritable = await mainHandle.createWritable();
+        await mainWritable.write(bytes);
+        await mainWritable.close();
+
+        db = await sqlite3.open_v2('inventory', undefined, 'opfs');
+        await migrate();
+        ctx.postMessage({ type: 'ok', requestId: request.requestId });
+        break;
+      }
+
       case 'getMeta': {
         const meta: Record<string, Lookup[]> = {};
         for (const table of LOOKUP_TABLES) {

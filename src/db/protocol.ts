@@ -30,6 +30,12 @@ export const ExportRequest = z.object({
   requestId: z.string(),
 });
 
+export const ImportRequest = z.object({
+  type: z.literal('import'),
+  requestId: z.string(),
+  data: z.instanceof(Uint8Array),
+});
+
 export const GetMetaRequest = z.object({
   type: z.literal('getMeta'),
   requestId: z.string(),
@@ -63,6 +69,7 @@ export const RequestSchema = z.discriminatedUnion('type', [
   UpdateRequest,
   RemoveRequest,
   ExportRequest,
+  ImportRequest,
   GetMetaRequest,
   LookupAddRequest,
   LookupRenameRequest,

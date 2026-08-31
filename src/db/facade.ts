@@ -82,6 +82,12 @@ export class DbFacade {
     });
   }
 
+  importDatabase(data: Uint8Array<ArrayBuffer>): Promise<void> {
+    return this.request<unknown>({ type: 'import', requestId: crypto.randomUUID(), data }).then(
+      () => undefined,
+    );
+  }
+
   addLookup(table: LookupTable, name: string): Promise<Lookup> {
     return this.request<unknown>({ type: 'lookupAdd', requestId: crypto.randomUUID(), table, name }).then(
       (data) => LookupSchema.parse(data),
