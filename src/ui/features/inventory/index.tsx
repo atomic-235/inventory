@@ -19,7 +19,6 @@ type FormState = {
   category: string;
   quantity: string;
   unit: string;
-  location: string;
   purchase_date: string;
   purchase_price: string;
   condition: string;
@@ -33,7 +32,6 @@ function toFormState(fields: Partial<ItemFields>): FormState {
     category: fields.category ?? '',
     quantity: fields.quantity?.toString() ?? '1',
     unit: fields.unit ?? '',
-    location: fields.location ?? '',
     purchase_date: fields.purchase_date ?? '',
     purchase_price: fields.purchase_price?.toString() ?? '',
     condition: fields.condition ?? '',
@@ -48,7 +46,6 @@ function formToFields(form: FormState): ItemFields {
     category: form.category,
     quantity: form.quantity === '' ? 1 : form.quantity,
     unit: form.unit,
-    location: form.location,
     purchase_date: form.purchase_date,
     purchase_price: form.purchase_price === '' ? null : form.purchase_price,
     condition: form.condition,
@@ -73,7 +70,6 @@ function applyDefaults(prev: FormState, src: Item): FormState {
   const next = { ...prev };
   if (!next.category) next.category = src.category;
   if (!next.unit) next.unit = src.unit;
-  if (!next.location) next.location = src.location;
   if (!next.condition) next.condition = src.condition;
   if (next.purchase_price === '') next.purchase_price = src.purchase_price?.toString() ?? '';
   if (next.quantity === '1') next.quantity = String(src.quantity);
@@ -229,13 +225,6 @@ function ItemForm(props: {
         options={suggestions.units}
         onChange={(v) => onChange('unit', v)}
       />
-      <ComboboxField
-        label="Location"
-        id="item-location"
-        value={form.location}
-        options={suggestions.locations}
-        onChange={(v) => onChange('location', v)}
-      />
       <TextInput
         label="Purchase date"
         id="item-purchase-date"
@@ -278,7 +267,7 @@ function ItemForm(props: {
 function matches(item: Item, query: string): boolean {
   if (!query) return true;
   const q = query.toLowerCase();
-  return [item.name, item.category, item.location, item.notes]
+  return [item.name, item.category, item.notes]
     .some((v) => v.toLowerCase().includes(q));
 }
 
@@ -305,7 +294,6 @@ export default function InventoryView() {
   const filtered = list.filter((i) => matches(i, query));
   const suggestions = buildAutocomplete(list, {
     categories: metaData.categories.map((c) => c.name),
-    locations: metaData.locations.map((l) => l.name),
     units: metaData.units.map((u) => u.name),
     conditions: metaData.conditions.map((c) => c.name),
   });
@@ -526,7 +514,6 @@ export default function InventoryView() {
               <span>
                 {item.name}
                 {item.category ? ` — ${item.category}` : ''}
-                {item.location ? ` @ ${item.location}` : ''}
                 {item.quantity > 1 ? ` (x${item.quantity})` : ''}
               </span>
               <button onClick={() => onEdit(item)}>Edit</button>

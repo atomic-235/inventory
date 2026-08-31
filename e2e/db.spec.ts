@@ -12,7 +12,6 @@ test('db worker initializes and persists items across reload', async ({ page }) 
       category: 'Electronics',
       quantity: 1,
       unit: 'pc',
-      location: 'Office',
       purchase_date: '',
       purchase_price: null,
       condition: 'good',

@@ -55,4 +55,15 @@ export const MIGRATIONS: string[] = [
     key TEXT PRIMARY KEY,
     value TEXT NOT NULL
   );`,
+
+  // v5: unify locations into the items containment graph (drop the locations table)
+  `INSERT INTO items
+    (id, name, category_id, quantity, unit_id, purchase_date, purchase_price, condition_id, notes, parent_id)
+   SELECT 'loc-' || locations.id, locations.name, NULL, 1, NULL, '', NULL, NULL, '', NULL
+   FROM locations;
+   UPDATE items
+     SET parent_id = (SELECT 'loc-' || locations.id FROM locations WHERE locations.id = items.location_id)
+     WHERE location_id IS NOT NULL AND parent_id IS NULL;
+   ALTER TABLE items DROP COLUMN location_id;
+   DROP TABLE locations;`,
 ];

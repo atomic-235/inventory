@@ -31,7 +31,6 @@ const item: Item = {
   category: 'Furniture',
   quantity: 2,
   unit: 'pc',
-  location: 'Living Room',
   purchase_date: '2026-01-15',
   purchase_price: 99.99,
   condition: 'good',

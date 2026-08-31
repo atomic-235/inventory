@@ -49,7 +49,7 @@ function mockFetchResponse(content: string) {
 }
 
 describe('extractItem', () => {
-  const valid = '{"name":"Camera","category":"Electronics","quantity":1,"unit":"","location":"","purchase_price":null,"condition":"good","notes":""}';
+  const valid = '{"name":"Camera","category":"Electronics","quantity":1,"unit":"","purchase_price":null,"condition":"good","notes":""}';
 
   function configure(): void {
     localStorage.setItem(

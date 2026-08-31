@@ -31,7 +31,6 @@ describe('ItemsStore', () => {
     category: '',
     quantity: 1,
     unit: '',
-    location: '',
     purchase_date: '',
     purchase_price: null,
     condition: '',

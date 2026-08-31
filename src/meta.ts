@@ -8,7 +8,7 @@ export interface MetaDb {
   removeLookup(table: LookupTable, id: number): Promise<void>;
 }
 
-const EMPTY: Meta = { categories: [], locations: [], units: [], conditions: [] };
+const EMPTY: Meta = { categories: [], units: [], conditions: [] };
 
 export class MetaStore extends Store<Meta> {
   constructor(private db: MetaDb) {

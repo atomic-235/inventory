@@ -15,7 +15,7 @@ async function seed(page: import('@playwright/test').Page, item: ItemFieldsInput
 }
 
 // S1 — first-run onboarding: brand-new values entered inline via the "+" buttons.
-test('first item: create category/unit/location inline, then it lands in Manage', async ({ page }) => {
+test('first item: create category/unit inline, then it lands in Manage', async ({ page }) => {
   await page.goto('/');
 
   await page.getByLabel('Name').fill('Espresso machine');
@@ -27,10 +27,6 @@ test('first item: create category/unit/location inline, then it lands in Manage'
   await page.getByLabel('Unit', { exact: true }).fill('pc');
   await page.getByRole('button', { name: 'Done' }).click();
 
-  await page.getByRole('button', { name: 'Add Location' }).click();
-  await page.getByLabel('Location', { exact: true }).fill('Counter');
-  await page.getByRole('button', { name: 'Done' }).click();
-
   await page.getByRole('button', { name: 'Add', exact: true }).click();
 
   await expect(page.getByTestId('item-list')).toContainText('Espresso machine');
@@ -39,7 +35,6 @@ test('first item: create category/unit/location inline, then it lands in Manage'
   await page.goto('/#/manage');
   await expect(page.getByTestId('lookup-categories')).toContainText('Kitchen');
   await expect(page.getByTestId('lookup-units')).toContainText('pc');
-  await expect(page.getByTestId('lookup-locations')).toContainText('Counter');
 });
 
 // S2 — autofill must not clobber a value the user already picked by hand.
@@ -50,7 +45,6 @@ test('autofill fills only empty fields, leaving manual choices intact', async ({
     category: 'Electronics',
     quantity: 2,
     unit: 'pc',
-    location: 'Office',
     condition: 'good',
     purchase_price: 999.99,
   });

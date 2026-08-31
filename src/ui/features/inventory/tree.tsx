@@ -55,7 +55,6 @@ export function ItemTreeView(props: {
           <span class="tree-name">{item.name}</span>
           <span class="tree-meta">
             {item.category ? `${item.category}` : ''}
-            {item.location ? ` @ ${item.location}` : ''}
             {item.quantity > 1 ? ` ×${item.quantity}` : ''}
           </span>
           <span class="tree-actions">

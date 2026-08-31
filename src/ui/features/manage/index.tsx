@@ -66,7 +66,6 @@ export default function ManageView() {
     <div>
       <h2>Manage</h2>
       <LookupSection title="Categories" table="categories" items={m.categories} />
-      <LookupSection title="Locations" table="locations" items={m.locations} />
       <LookupSection title="Units" table="units" items={m.units} />
       <LookupSection title="Conditions" table="conditions" items={m.conditions} />
     </div>

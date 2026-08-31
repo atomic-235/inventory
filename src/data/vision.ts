@@ -8,7 +8,7 @@ const SYSTEM_PROMPT = [
   'Extract structured inventory data from a photo of an item/product.',
   'Return JSON with ONLY these fields:',
   'name (string, required), category (string), quantity (positive integer, default 1),',
-  'unit (string), location (string), purchase_price (number or null), condition (string), notes (string).',
+  'unit (string), purchase_price (number or null), condition (string), notes (string).',
   'Leave unknown optional fields as empty string.',
 ].join(' ');
 

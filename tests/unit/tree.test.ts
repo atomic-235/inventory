@@ -9,7 +9,6 @@ function item(partial: Partial<Item>): Item {
     category: '',
     quantity: 1,
     unit: '',
-    location: '',
     purchase_date: '',
     purchase_price: null,
     condition: '',

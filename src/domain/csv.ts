@@ -7,7 +7,6 @@ export const CSV_COLUMNS = [
   'category',
   'quantity',
   'unit',
-  'location',
   'purchase_date',
   'purchase_price',
   'condition',

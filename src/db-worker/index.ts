@@ -17,7 +17,6 @@ const ctx = self as unknown as {
 
 const ITEM_COLUMN: Record<LookupTable, string> = {
   categories: 'category_id',
-  locations: 'location_id',
   units: 'unit_id',
   conditions: 'condition_id',
 };
@@ -70,7 +69,6 @@ function listSql(): string {
     COALESCE(categories.name, '') AS category,
     items.quantity AS quantity,
     COALESCE(units.name, '') AS unit,
-    COALESCE(locations.name, '') AS location,
     items.purchase_date AS purchase_date,
     items.purchase_price AS purchase_price,
     COALESCE(conditions.name, '') AS condition,
@@ -78,7 +76,6 @@ function listSql(): string {
     items.parent_id AS parent_id
     FROM items
     LEFT JOIN categories ON items.category_id = categories.id
-    LEFT JOIN locations ON items.location_id = locations.id
     LEFT JOIN units ON items.unit_id = units.id
     LEFT JOIN conditions ON items.condition_id = conditions.id
     ORDER BY items.name`;
@@ -109,16 +106,15 @@ async function handle(request: Request): Promise<void> {
       case 'insert': {
         const { item } = request;
         const categoryId = await resolveLookup('categories', item.category);
-        const locationId = await resolveLookup('locations', item.location);
         const unitId = await resolveLookup('units', item.unit);
         const conditionId = await resolveLookup('conditions', item.condition);
         await sqlite3.run(
           db,
           `INSERT INTO items
-            (id, name, category_id, quantity, unit_id, location_id, purchase_date, purchase_price, condition_id, notes, parent_id)
-            VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`,
+            (id, name, category_id, quantity, unit_id, purchase_date, purchase_price, condition_id, notes, parent_id)
+            VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`,
           [
-            item.id, item.name, categoryId, item.quantity, unitId, locationId,
+            item.id, item.name, categoryId, item.quantity, unitId,
             item.purchase_date, item.purchase_price, conditionId, item.notes, item.parent_id,
           ],
         );
@@ -129,7 +125,6 @@ async function handle(request: Request): Promise<void> {
       case 'update': {
         const { item } = request;
         const categoryId = await resolveLookup('categories', item.category);
-        const locationId = await resolveLookup('locations', item.location);
         const unitId = await resolveLookup('units', item.unit);
         const conditionId = await resolveLookup('conditions', item.condition);
         if (item.parent_id) {
@@ -150,11 +145,11 @@ async function handle(request: Request): Promise<void> {
         await sqlite3.run(
           db,
           `UPDATE items SET
-            name = ?, category_id = ?, quantity = ?, unit_id = ?, location_id = ?,
+            name = ?, category_id = ?, quantity = ?, unit_id = ?,
             purchase_date = ?, purchase_price = ?, condition_id = ?, notes = ?, parent_id = ?
             WHERE id = ?`,
           [
-            item.name, categoryId, item.quantity, unitId, locationId,
+            item.name, categoryId, item.quantity, unitId,
             item.purchase_date, item.purchase_price, conditionId, item.notes, item.parent_id, item.id,
           ],
         );

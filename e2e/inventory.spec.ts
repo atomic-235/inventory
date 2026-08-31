@@ -7,7 +7,6 @@ const CANNED = {
   category: 'Electronics',
   quantity: 1,
   unit: 'pc',
-  location: 'Office',
   purchase_date: '',
   purchase_price: null,
   condition: 'good',
@@ -58,7 +57,6 @@ test('edit item updates the list', async ({ page }) => {
     category: 'Furniture',
     quantity: 1,
     unit: '',
-    location: '',
     purchase_date: '',
     purchase_price: null,
     condition: '',
@@ -106,7 +104,7 @@ test('export csv downloads inventory.csv', async ({ page }) => {
 
 test('typing a known name autofills related fields', async ({ page }) => {
   await page.goto('/');
-  await seed(page, { name: 'Sony TV', category: 'Electronics', unit: 'pc', location: 'Office', condition: 'good', purchase_price: 999.99, quantity: 2 });
+  await seed(page, { name: 'Sony TV', category: 'Electronics', unit: 'pc', condition: 'good', purchase_price: 999.99, quantity: 2 });
   await page.reload();
   await expect(page.getByTestId('item-list')).toContainText('Sony TV');
 
@@ -115,7 +113,6 @@ test('typing a known name autofills related fields', async ({ page }) => {
 
   await expect(page.getByLabel('Category', { exact: true })).toHaveValue('Electronics');
   await expect(page.getByLabel('Unit', { exact: true })).toHaveValue('pc');
-  await expect(page.getByLabel('Location', { exact: true })).toHaveValue('Office');
   await expect(page.getByLabel('Condition', { exact: true })).toHaveValue('good');
   await expect(page.getByLabel('Purchase price')).toHaveValue('999.99');
   await expect(page.getByLabel('Quantity')).toHaveValue('2');
@@ -123,24 +120,17 @@ test('typing a known name autofills related fields', async ({ page }) => {
 
 test('add manually selects from dropdowns', async ({ page }) => {
   await page.goto('/');
-  await seed(page, { name: 'TV', category: 'Electronics', location: 'Office', unit: 'pc' });
-  await seed(page, { name: 'Drill', category: 'Electronics', location: 'Garage', unit: 'pc' });
-  await seed(page, { name: 'Sofa', category: 'Furniture', location: 'Living Room', unit: 'set' });
+  await seed(page, { name: 'TV', category: 'Electronics', unit: 'pc' });
+  await seed(page, { name: 'Drill', category: 'Electronics', unit: 'pc' });
+  await seed(page, { name: 'Sofa', category: 'Furniture', unit: 'set' });
   await page.reload();
 
   await expect(page.getByLabel('Name')).toBeVisible();
   await expect(page.getByTestId('item-list')).toContainText('TV');
 
-  await page.getByLabel('Category', { exact: true }).selectOption('Electronics');
-
-  // all locations remain available (no cross-dependence filtering)
-  const locations = await page.$$eval('#item-location option', (els) =>
-    els.map((e) => e.getAttribute('value')).filter((v) => v !== ''),
-  );
-  expect(locations).toEqual(['Garage', 'Living Room', 'Office']);
-
   await page.getByLabel('Name').fill('Monitor');
-  await page.getByLabel('Location', { exact: true }).selectOption('Garage');
+  await page.getByLabel('Category', { exact: true }).selectOption('Electronics');
+  await page.getByLabel('Unit', { exact: true }).selectOption('pc');
   await page.getByRole('button', { name: 'Add', exact: true }).click();
 
   await expect(page.getByTestId('item-list')).toContainText('Monitor');

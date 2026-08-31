@@ -9,7 +9,6 @@ describe('ItemSchema', () => {
       category: 'Furniture',
       quantity: 2,
       unit: 'pc',
-      location: 'Living Room',
       purchase_date: '2026-01-15',
       purchase_price: 99.99,
       condition: 'good',
@@ -25,7 +24,6 @@ describe('ItemSchema', () => {
     expect(result.category).toBe('');
     expect(result.quantity).toBe(1);
     expect(result.unit).toBe('');
-    expect(result.location).toBe('');
     expect(result.purchase_price).toBeNull();
   });
 
