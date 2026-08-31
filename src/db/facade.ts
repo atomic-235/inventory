@@ -1,10 +1,10 @@
 import { ResponseSchema, ListResult } from './protocol';
 import type { Request } from './protocol';
 import { MetaSchema, LookupSchema } from '../domain/lookup';
-import { SettingsSchema } from '../domain/settings';
+import { SettingsSchema, SyncConfigSchema } from '../domain/settings';
 import type { Item, ItemFieldsInput } from '../domain/item';
 import type { Meta, Lookup, LookupTable } from '../domain/lookup';
-import type { ProviderConfig } from '../domain/settings';
+import type { ProviderConfig, SyncConfig } from '../domain/settings';
 
 export interface Transport {
   postMessage(message: Request): void;
@@ -87,6 +87,23 @@ export class DbFacade {
   saveSettings(config: ProviderConfig): Promise<void> {
     return this.request<unknown>({
       type: 'saveSettings',
+      requestId: crypto.randomUUID(),
+      value: JSON.stringify(config),
+    }).then(() => undefined);
+  }
+
+  getSyncSettings(): Promise<SyncConfig | null> {
+    return this.request<unknown>({ type: 'getSyncSettings', requestId: crypto.randomUUID() }).then(
+      (data) => {
+        if (data == null) return null;
+        return SyncConfigSchema.parse(JSON.parse(String(data)));
+      },
+    );
+  }
+
+  saveSyncSettings(config: SyncConfig): Promise<void> {
+    return this.request<unknown>({
+      type: 'saveSyncSettings',
       requestId: crypto.randomUUID(),
       value: JSON.stringify(config),
     }).then(() => undefined);

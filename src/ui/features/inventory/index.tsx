@@ -5,12 +5,13 @@ import { db } from '../../../db';
 import { useMeta, meta } from '../../useMeta';
 import { captureFrame } from '../../../data/camera';
 import { extractItem } from '../../../data/vision';
-import { saveConfig } from '../../../data/config';
+import { saveConfig, loadSyncConfig, saveSyncConfig } from '../../../data/config';
 import { itemsToCsv } from '../../../domain/csv';
 import { buildAutocomplete, findLastBy } from '../../../domain/autocomplete';
 import type { Autocomplete } from '../../../domain/autocomplete';
 import { ItemTreeView } from './tree';
 import { itemPath } from '../../../domain/tree';
+import { uploadToCloud, restoreFromCloud } from '../../../data/sync';
 import { ItemFieldsSchema } from '../../../domain/item';
 import type { Item, ItemFields } from '../../../domain/item';
 import { ZodError } from 'zod';
@@ -284,6 +285,7 @@ export default function InventoryView() {
   const [formError, setFormError] = useState<string | null>(null);
   const [importError, setImportError] = useState<string | null>(null);
   const [treeError, setTreeError] = useState<string | null>(null);
+  const [syncError, setSyncError] = useState<string | null>(null);
   const [view, setView] = useState<'list' | 'tree'>('list');
   const fileRef = useRef<HTMLInputElement>(null);
 
@@ -417,6 +419,42 @@ export default function InventoryView() {
     setEditingId(null);
   }
 
+  async function onUploadToCloud() {
+    setSyncError(null);
+    try {
+      const cfg = loadSyncConfig();
+      const passphrase = window.prompt('Set a passphrase for this backup:');
+      if (passphrase == null) return;
+      const confirm = window.prompt('Confirm passphrase:');
+      if (confirm !== passphrase) throw new Error('Passphrases do not match');
+      await uploadToCloud(cfg, passphrase);
+      setNotice('Uploaded to cloud');
+      window.setTimeout(() => setNotice(null), 2000);
+    } catch (err) {
+      setSyncError(err instanceof Error ? err.message : String(err));
+    }
+  }
+
+  async function onRestoreFromCloud() {
+    setSyncError(null);
+    try {
+      const cfg = loadSyncConfig();
+      const passphrase = window.prompt('Enter passphrase:');
+      if (passphrase == null) return;
+      await restoreFromCloud(cfg, passphrase);
+      await items.refresh();
+      await meta.refresh();
+      const importedProvider = await db.getSettings();
+      if (importedProvider) saveConfig(importedProvider);
+      const imported = await db.getSyncSettings();
+      if (imported) saveSyncConfig(imported);
+      setNotice('Restored from cloud');
+      window.setTimeout(() => setNotice(null), 2000);
+    } catch (err) {
+      setSyncError(err instanceof Error ? err.message : String(err));
+    }
+  }
+
   return (
     <section id="inventory">
       <h2>Items</h2>
@@ -457,6 +495,14 @@ export default function InventoryView() {
           onChange={onImportFile}
         />
 
+        <button onClick={onUploadToCloud}>
+          Upload to cloud
+        </button>
+
+        <button onClick={onRestoreFromCloud}>
+          Restore from cloud
+        </button>
+
         <div class="view-toggle">
           <button
             class={view === 'list' ? 'active' : ''}
@@ -476,6 +522,8 @@ export default function InventoryView() {
       </div>
 
       {importError ? <p role="alert">{importError}</p> : null}
+
+      {syncError ? <p role="alert">{syncError}</p> : null}
 
       {treeError ? <p role="alert">{treeError}</p> : null}
 

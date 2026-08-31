@@ -52,6 +52,17 @@ export const SaveSettingsRequest = z.object({
   value: z.string(),
 });
 
+export const GetSyncSettingsRequest = z.object({
+  type: z.literal('getSyncSettings'),
+  requestId: z.string(),
+});
+
+export const SaveSyncSettingsRequest = z.object({
+  type: z.literal('saveSyncSettings'),
+  requestId: z.string(),
+  value: z.string(),
+});
+
 export const LookupAddRequest = z.object({
   type: z.literal('lookupAdd'),
   requestId: z.string(),
@@ -84,6 +95,8 @@ export const RequestSchema = z.discriminatedUnion('type', [
   GetMetaRequest,
   GetSettingsRequest,
   SaveSettingsRequest,
+  GetSyncSettingsRequest,
+  SaveSyncSettingsRequest,
   LookupAddRequest,
   LookupRenameRequest,
   LookupRemoveRequest,

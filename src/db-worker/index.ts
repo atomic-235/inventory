@@ -250,6 +250,30 @@ async function handle(request: Request): Promise<void> {
         break;
       }
 
+      case 'getSyncSettings': {
+        const { rows } = await sqlite3.execWithParams(
+          db,
+          `SELECT value FROM app_settings WHERE key = 'sync'`,
+        );
+        ctx.postMessage({
+          type: 'ok',
+          requestId: request.requestId,
+          data: rows[0]?.[0] ?? null,
+        });
+        break;
+      }
+
+      case 'saveSyncSettings': {
+        await sqlite3.run(
+          db,
+          `INSERT INTO app_settings(key, value) VALUES ('sync', ?)
+           ON CONFLICT(key) DO UPDATE SET value = excluded.value`,
+          [request.value],
+        );
+        ctx.postMessage({ type: 'ok', requestId: request.requestId });
+        break;
+      }
+
       case 'getMeta': {
         const meta: Record<string, Lookup[]> = {};
         for (const table of LOOKUP_TABLES) {
