@@ -5,6 +5,7 @@ import type { Item } from '../../src/domain/item';
 const item: Item = {
   id: '1',
   name: 'Lamp',
+  parent_id: null,
   category: 'Furniture',
   quantity: 2,
   unit: 'pc',
@@ -24,8 +25,8 @@ describe('itemsToCsv', () => {
   it('emits rows in the correct column order', () => {
     const csv = itemsToCsv([item]);
     const [header, row] = csv.split('\n');
-    expect(header).toBe('id,name,category,quantity,unit,location,purchase_date,purchase_price,condition,notes');
-    expect(row).toBe('1,Lamp,Furniture,2,pc,Living Room,2026-01-15,99.99,good,');
+    expect(header).toBe('id,name,parent_id,category,quantity,unit,location,purchase_date,purchase_price,condition,notes');
+    expect(row).toBe('1,Lamp,,Furniture,2,pc,Living Room,2026-01-15,99.99,good,');
   });
 
   it('quotes values containing commas or quotes', () => {

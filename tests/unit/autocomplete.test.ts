@@ -14,6 +14,7 @@ function item(partial: Partial<Item>): Item {
     purchase_price: null,
     condition: '',
     notes: '',
+    parent_id: null,
     ...partial,
   };
 }

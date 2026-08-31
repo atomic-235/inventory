@@ -46,4 +46,7 @@ export const MIGRATIONS: string[] = [
   ALTER TABLE items DROP COLUMN location;
   ALTER TABLE items DROP COLUMN unit;
   ALTER TABLE items DROP COLUMN condition;`,
+
+  // v3: containment graph — self-referential parent FK (adjacency list)
+  `ALTER TABLE items ADD COLUMN parent_id TEXT REFERENCES items(id) ON DELETE SET NULL;`,
 ];

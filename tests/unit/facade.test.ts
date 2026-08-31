@@ -27,6 +27,7 @@ class FakeTransport {
 const item: Item = {
   id: '1',
   name: 'Lamp',
+  parent_id: null,
   category: 'Furniture',
   quantity: 2,
   unit: 'pc',

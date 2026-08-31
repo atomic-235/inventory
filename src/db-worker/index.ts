@@ -74,7 +74,8 @@ function listSql(): string {
     items.purchase_date AS purchase_date,
     items.purchase_price AS purchase_price,
     COALESCE(conditions.name, '') AS condition,
-    items.notes AS notes
+    items.notes AS notes,
+    items.parent_id AS parent_id
     FROM items
     LEFT JOIN categories ON items.category_id = categories.id
     LEFT JOIN locations ON items.location_id = locations.id
@@ -114,11 +115,11 @@ async function handle(request: Request): Promise<void> {
         await sqlite3.run(
           db,
           `INSERT INTO items
-            (id, name, category_id, quantity, unit_id, location_id, purchase_date, purchase_price, condition_id, notes)
-            VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`,
+            (id, name, category_id, quantity, unit_id, location_id, purchase_date, purchase_price, condition_id, notes, parent_id)
+            VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`,
           [
             item.id, item.name, categoryId, item.quantity, unitId, locationId,
-            item.purchase_date, item.purchase_price, conditionId, item.notes,
+            item.purchase_date, item.purchase_price, conditionId, item.notes, item.parent_id,
           ],
         );
         ctx.postMessage({ type: 'ok', requestId: request.requestId });
@@ -131,15 +132,30 @@ async function handle(request: Request): Promise<void> {
         const locationId = await resolveLookup('locations', item.location);
         const unitId = await resolveLookup('units', item.unit);
         const conditionId = await resolveLookup('conditions', item.condition);
+        if (item.parent_id) {
+          const cycle = await sqlite3.execWithParams(
+            db,
+            `WITH RECURSIVE descendants(id) AS (
+              SELECT id FROM items WHERE parent_id = ?
+              UNION ALL
+              SELECT i.id FROM items i JOIN descendants d ON i.parent_id = d.id
+            )
+            SELECT 1 FROM descendants WHERE id = ?`,
+            [item.id, item.parent_id],
+          );
+          if (cycle.rows.length > 0) {
+            throw new Error('Cannot place an item inside its own contents');
+          }
+        }
         await sqlite3.run(
           db,
           `UPDATE items SET
             name = ?, category_id = ?, quantity = ?, unit_id = ?, location_id = ?,
-            purchase_date = ?, purchase_price = ?, condition_id = ?, notes = ?
+            purchase_date = ?, purchase_price = ?, condition_id = ?, notes = ?, parent_id = ?
             WHERE id = ?`,
           [
             item.name, categoryId, item.quantity, unitId, locationId,
-            item.purchase_date, item.purchase_price, conditionId, item.notes, item.id,
+            item.purchase_date, item.purchase_price, conditionId, item.notes, item.parent_id, item.id,
           ],
         );
         ctx.postMessage({ type: 'ok', requestId: request.requestId });

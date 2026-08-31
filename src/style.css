@@ -170,12 +170,18 @@ p[role="status"] {
 
 .inventory-toolbar {
   display: flex;
+  flex-wrap: wrap;
   gap: 0.5rem;
   margin-bottom: 0.75rem;
 }
 
 .inventory-toolbar input[type="search"] {
-  flex: 1;
+  flex: 1 1 100%;
+  order: -1;
+}
+
+.inventory-toolbar .view-toggle {
+  margin-left: auto;
 }
 
 .lookup-add {
@@ -204,4 +210,89 @@ p[role="status"] {
 .lookup-section li span,
 .lookup-section li input {
   flex: 1;
+}
+
+.view-toggle {
+  display: flex;
+  gap: 0.25rem;
+}
+
+.view-toggle button.active {
+  background: var(--accent);
+  border-color: var(--accent);
+  color: #fff;
+}
+
+.tree {
+  margin-top: 0.75rem;
+}
+
+.tree-root {
+  border: 1px dashed var(--border);
+  border-radius: 6px;
+  padding: 0.4rem 0.6rem;
+  color: var(--muted);
+  font-size: 0.85rem;
+}
+
+.tree-row {
+  display: flex;
+  align-items: center;
+  gap: 0.4rem;
+  padding: 0.35rem 0.4rem;
+  border-radius: 6px;
+}
+
+.tree-row:hover {
+  background: #eef2f7;
+}
+
+.tree-row--over,
+.tree-root.tree-row--over {
+  background: #dbeafe;
+  outline: 2px dashed var(--accent);
+  outline-offset: -2px;
+}
+
+.tree-root.tree-row--over {
+  background: #dbeafe;
+  outline: 2px dashed var(--accent);
+  outline-offset: -2px;
+}
+
+.twisty {
+  border: none;
+  background: none;
+  width: 1.4rem;
+  padding: 0;
+  color: var(--muted);
+  font-size: 0.7rem;
+  cursor: pointer;
+}
+
+.twisty--leaf {
+  display: inline-block;
+  width: 1.4rem;
+}
+
+.tree-name {
+  font-weight: 600;
+}
+
+.tree-meta {
+  color: var(--muted);
+  font-size: 0.85rem;
+  flex: 1;
+}
+
+.tree-actions {
+  display: flex;
+  gap: 0.3rem;
+}
+
+.tree-list {
+  list-style: none;
+  padding: 0;
+  margin: 0;
+  margin-left: 0;
 }

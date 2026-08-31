@@ -11,6 +11,7 @@ export const ItemSchema = z.object({
   purchase_price: z.coerce.number().nonnegative().nullable().default(null),
   condition: z.string().default(''),
   notes: z.string().default(''),
+  parent_id: z.string().nullable().default(null),
 });
 
 export type Item = z.infer<typeof ItemSchema>;

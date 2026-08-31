@@ -3,6 +3,7 @@ import type { Item } from './item';
 export const CSV_COLUMNS = [
   'id',
   'name',
+  'parent_id',
   'category',
   'quantity',
   'unit',

@@ -8,6 +8,7 @@ import { extractItem } from '../../../data/vision';
 import { itemsToCsv } from '../../../domain/csv';
 import { buildAutocomplete, findLastBy } from '../../../domain/autocomplete';
 import type { Autocomplete } from '../../../domain/autocomplete';
+import { ItemTreeView } from './tree';
 import { ItemFieldsSchema } from '../../../domain/item';
 import type { Item, ItemFields } from '../../../domain/item';
 import { ZodError } from 'zod';
@@ -22,6 +23,7 @@ type FormState = {
   purchase_price: string;
   condition: string;
   notes: string;
+  containerId: string;
 };
 
 function toFormState(fields: Partial<ItemFields>): FormState {
@@ -35,14 +37,22 @@ function toFormState(fields: Partial<ItemFields>): FormState {
     purchase_price: fields.purchase_price?.toString() ?? '',
     condition: fields.condition ?? '',
     notes: fields.notes ?? '',
+    containerId: fields.parent_id ?? '',
   };
 }
 
 function formToFields(form: FormState): ItemFields {
   return ItemFieldsSchema.parse({
-    ...form,
+    name: form.name,
+    category: form.category,
     quantity: form.quantity === '' ? 1 : form.quantity,
+    unit: form.unit,
+    location: form.location,
+    purchase_date: form.purchase_date,
     purchase_price: form.purchase_price === '' ? null : form.purchase_price,
+    condition: form.condition,
+    notes: form.notes,
+    parent_id: form.containerId === '' ? null : form.containerId,
   });
 }
 
@@ -164,6 +174,7 @@ function ItemForm(props: {
   onNameBlur: () => void;
   submitLabel: string;
   suggestions: Autocomplete;
+  containers: { id: string; name: string }[];
   onSubmit: (e: Event) => void;
   onCancel?: () => void;
 }) {
@@ -180,6 +191,21 @@ function ItemForm(props: {
         onInput={(v) => onChange('name', v)}
         onBlur={props.onNameBlur}
       />
+      <div>
+        <label htmlFor="item-container">Container</label>
+        <select
+          id="item-container"
+          value={form.containerId}
+          onChange={(e) => onChange('containerId', e.currentTarget.value)}
+        >
+          <option value="">—</option>
+          {props.containers.map((c) => (
+            <option key={c.id} value={c.id}>
+              {c.name}
+            </option>
+          ))}
+        </select>
+      </div>
       <ComboboxField
         label="Category"
         id="item-category"
@@ -266,7 +292,14 @@ export default function InventoryView() {
   const [notice, setNotice] = useState<string | null>(null);
   const [formError, setFormError] = useState<string | null>(null);
   const [importError, setImportError] = useState<string | null>(null);
+  const [treeError, setTreeError] = useState<string | null>(null);
+  const [view, setView] = useState<'list' | 'tree'>('list');
   const fileRef = useRef<HTMLInputElement>(null);
+
+  const containers = list
+    .filter((i) => i.id !== editingId)
+    .map((i) => ({ id: i.id, name: i.name }))
+    .sort((a, b) => a.name.localeCompare(b.name));
 
   const filtered = list.filter((i) => matches(i, query));
   const suggestions = buildAutocomplete(list, {
@@ -376,6 +409,22 @@ export default function InventoryView() {
     }
   }
 
+  async function onReparent(id: string, parentId: string | null) {
+    const item = list.find((i) => i.id === id);
+    if (!item || item.parent_id === parentId) return;
+    try {
+      await items.update({ ...item, parent_id: parentId });
+      setTreeError(null);
+    } catch (err) {
+      setTreeError(err instanceof Error ? err.message : String(err));
+    }
+  }
+
+  function onAddChild(parentId: string) {
+    setForm(toFormState({ parent_id: parentId }));
+    setEditingId(null);
+  }
+
   return (
     <section id="inventory">
       <h2>Items</h2>
@@ -415,9 +464,28 @@ export default function InventoryView() {
           style="display:none"
           onChange={onImportFile}
         />
+
+        <div class="view-toggle">
+          <button
+            class={view === 'list' ? 'active' : ''}
+            onClick={() => setView('list')}
+            aria-pressed={view === 'list'}
+          >
+            List
+          </button>
+          <button
+            class={view === 'tree' ? 'active' : ''}
+            onClick={() => setView('tree')}
+            aria-pressed={view === 'tree'}
+          >
+            Tree
+          </button>
+        </div>
       </div>
 
       {importError ? <p role="alert">{importError}</p> : null}
+
+      {treeError ? <p role="alert">{treeError}</p> : null}
 
       {flowError ? <p role="alert">{flowError}</p> : null}
 
@@ -433,12 +501,21 @@ export default function InventoryView() {
         onNameBlur={onNameBlur}
         submitLabel={editingId ? 'Update' : 'Add'}
         suggestions={suggestions}
+        containers={containers}
         onSubmit={onSubmit}
         onCancel={editingId ? onCancel : undefined}
       />
 
       {loading ? (
         <p>Loading...</p>
+      ) : view === 'tree' ? (
+        <ItemTreeView
+          items={list}
+          onEdit={onEdit}
+          onDelete={(id) => items.remove(id)}
+          onAddChild={onAddChild}
+          onReparent={onReparent}
+        />
       ) : (
         <ul data-testid="item-list">
           {filtered.map((item) => (
