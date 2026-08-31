@@ -57,10 +57,13 @@ expecting the new env to take effect.
 `page.goto('/')` will hit the wrong URL. Current: both on `127.0.0.1:4173`, while
 manual `pnpm dev` uses `5173`. Keep them in sync when changing.
 
-- `command: 'pnpm exec vite --host 127.0.0.1 --port 4173 --strictPort'` (NOT
-  `pnpm dev`, to avoid a pnpm grandchild that survives aborts as an orphan).
-- `stdout: 'pipe'` / `stderr: 'pipe'` — default `'ignore'` hides vite output and
-  makes hangs undiagnosable.
+- `command: 'pnpm exec vite build && pnpm exec vite preview --host 127.0.0.1
+  --port 4173 --strictPort'` — serves the **production build** (NOT the dev
+  server), because the dev server's on-demand dependency optimization triggers a
+  mid-test page reload ("optimized dependencies changed. reloading") that
+  destroys `page.evaluate` execution contexts.
+- `stdout: 'pipe'` / `stderr: 'pipe'` — default `'ignore'` hides output and makes
+  hangs undiagnosable.
 - `gracefulShutdown: { signal: 'SIGTERM', timeout: 500 }`.
 
 ### Orphan vite processes
