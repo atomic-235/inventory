@@ -1,5 +1,6 @@
 import { useHashRoute, navigate } from './router';
 import InventoryView from './ui/features/inventory';
+import ManageView from './ui/features/manage';
 import Settings from './ui/features/settings';
 
 export default function App() {
@@ -13,12 +14,22 @@ export default function App() {
           Items
         </a>
         {' | '}
+        <a href="#/manage" onClick={() => navigate('#/manage')}>
+          Manage
+        </a>
+        {' | '}
         <a href="#/settings" onClick={() => navigate('#/settings')}>
           Settings
         </a>
       </nav>
 
-      {route === '#/settings' ? <Settings /> : <InventoryView />}
+      {route === '#/manage' ? (
+        <ManageView />
+      ) : route === '#/settings' ? (
+        <Settings />
+      ) : (
+        <InventoryView />
+      )}
     </div>
   );
 }

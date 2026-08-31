@@ -45,7 +45,7 @@ test('add item by photo: capture -> extract -> prefill -> save -> listed', async
   await expect(name).toHaveValue('Camera');
   await expect(page.getByLabel('Category')).toHaveValue('Electronics');
 
-  await page.getByRole('button', { name: 'Save' }).click();
+  await page.getByRole('button', { name: 'Add', exact: true }).click();
 
   await expect(page.getByTestId('item-list')).toContainText('Camera');
   await expect(page.getByTestId('item-list')).toContainText('Electronics');
@@ -102,4 +102,44 @@ test('export csv downloads inventory.csv', async ({ page }) => {
   await page.getByRole('button', { name: 'Export CSV' }).click();
   const download = await downloadPromise;
   expect(download.suggestedFilename()).toBe('inventory.csv');
+});
+
+test('typing a known name autofills related fields', async ({ page }) => {
+  await page.goto('/');
+  await seed(page, { name: 'Sony TV', category: 'Electronics', unit: 'pc', location: 'Office', condition: 'good', purchase_price: 999.99, quantity: 2 });
+  await page.reload();
+  await expect(page.getByTestId('item-list')).toContainText('Sony TV');
+
+  await page.getByLabel('Name').fill('Sony TV');
+
+  await expect(page.getByLabel('Category')).toHaveValue('Electronics');
+  await expect(page.getByLabel('Unit')).toHaveValue('pc');
+  await expect(page.getByLabel('Location')).toHaveValue('Office');
+  await expect(page.getByLabel('Condition')).toHaveValue('good');
+  await expect(page.getByLabel('Purchase price')).toHaveValue('999.99');
+  await expect(page.getByLabel('Quantity')).toHaveValue('2');
+});
+
+test('add manually with cross-dependent autocomplete', async ({ page }) => {
+  await page.goto('/');
+  await seed(page, { name: 'TV', category: 'Electronics', location: 'Office', unit: 'pc' });
+  await seed(page, { name: 'Drill', category: 'Electronics', location: 'Garage', unit: 'pc' });
+  await seed(page, { name: 'Sofa', category: 'Furniture', location: 'Living Room', unit: 'set' });
+  await page.reload();
+
+  await expect(page.getByLabel('Name')).toBeVisible();
+  await expect(page.getByTestId('item-list')).toContainText('TV');
+
+  await page.getByLabel('Category').fill('Electronics');
+
+  const locations = await page.$$eval('#item-location-options option', (els) =>
+    els.map((e) => e.getAttribute('value')),
+  );
+  expect(locations).toEqual(['Garage', 'Office']);
+
+  await page.getByLabel('Name').fill('Monitor');
+  await page.getByLabel('Location').fill('Garage');
+  await page.getByRole('button', { name: 'Add', exact: true }).click();
+
+  await expect(page.getByTestId('item-list')).toContainText('Monitor');
 });

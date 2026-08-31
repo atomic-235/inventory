@@ -1,6 +1,8 @@
 import { ResponseSchema, ListResult } from './protocol';
 import type { Request } from './protocol';
+import { MetaSchema, LookupSchema } from '../domain/lookup';
 import type { Item, ItemFieldsInput } from '../domain/item';
+import type { Meta, Lookup, LookupTable } from '../domain/lookup';
 
 export interface Transport {
   postMessage(message: Request): void;
@@ -31,17 +33,18 @@ export class DbFacade {
   }
 
   private request<T>(request: Request): Promise<T> {
-    const id = request.requestId;
     return new Promise<T>((resolve, reject) => {
-      this.pending.set(id, { resolve: resolve as (d: unknown) => void, reject });
+      this.pending.set(request.requestId, {
+        resolve: resolve as (d: unknown) => void,
+        reject,
+      });
       this.transport.postMessage(request);
     });
   }
 
   listItems(): Promise<Item[]> {
-    const parsed = ListResult;
-    return this.request<unknown>({ type: 'list', requestId: crypto.randomUUID() }).then(
-      (data) => parsed.parse(data),
+    return this.request<unknown>({ type: 'list', requestId: crypto.randomUUID() }).then((data) =>
+      ListResult.parse(data),
     );
   }
 
@@ -60,6 +63,30 @@ export class DbFacade {
 
   removeItem(id: string): Promise<void> {
     return this.request<unknown>({ type: 'remove', requestId: crypto.randomUUID(), id }).then(
+      () => undefined,
+    );
+  }
+
+  getMeta(): Promise<Meta> {
+    return this.request<unknown>({ type: 'getMeta', requestId: crypto.randomUUID() }).then((data) =>
+      MetaSchema.parse(data),
+    );
+  }
+
+  addLookup(table: LookupTable, name: string): Promise<Lookup> {
+    return this.request<unknown>({ type: 'lookupAdd', requestId: crypto.randomUUID(), table, name }).then(
+      (data) => LookupSchema.parse(data),
+    );
+  }
+
+  renameLookup(table: LookupTable, id: number, name: string): Promise<void> {
+    return this.request<unknown>({ type: 'lookupRename', requestId: crypto.randomUUID(), table, id, name }).then(
+      () => undefined,
+    );
+  }
+
+  removeLookup(table: LookupTable, id: number): Promise<void> {
+    return this.request<unknown>({ type: 'lookupRemove', requestId: crypto.randomUUID(), table, id }).then(
       () => undefined,
     );
   }

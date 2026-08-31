@@ -146,3 +146,31 @@ p[role="status"] {
 .inventory-toolbar input[type="search"] {
   flex: 1;
 }
+
+.lookup-add {
+  display: flex;
+  gap: 0.5rem;
+}
+
+.lookup-add input {
+  flex: 1;
+}
+
+.lookup-section ul {
+  list-style: none;
+  padding: 0;
+  margin: 0.5rem 0 0;
+}
+
+.lookup-section li {
+  display: flex;
+  align-items: center;
+  gap: 0.5rem;
+  padding: 0.35rem 0;
+  border-bottom: 1px solid var(--border);
+}
+
+.lookup-section li span,
+.lookup-section li input {
+  flex: 1;
+}

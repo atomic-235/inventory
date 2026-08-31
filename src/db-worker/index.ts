@@ -6,11 +6,20 @@ import { MIGRATIONS } from '../db/migrations';
 import { RequestSchema } from '../db/protocol';
 import type { Request } from '../db/protocol';
 import { ItemSchema } from '../domain/item';
+import { LOOKUP_TABLES } from '../domain/lookup';
 import type { Item } from '../domain/item';
+import type { Lookup, LookupTable } from '../domain/lookup';
 
 const ctx = self as unknown as {
   postMessage(message: unknown): void;
   onmessage: ((e: MessageEvent) => void) | null;
+};
+
+const ITEM_COLUMN: Record<LookupTable, string> = {
+  categories: 'category_id',
+  locations: 'location_id',
+  units: 'unit_id',
+  conditions: 'condition_id',
 };
 
 let sqlite3: SQLiteAPI;
@@ -43,6 +52,37 @@ function rowsToItems(rows: unknown[][], columns: string[]): Item[] {
   });
 }
 
+async function resolveLookup(table: LookupTable, name: string): Promise<number | null> {
+  if (!name) return null;
+  await sqlite3.run(db, `INSERT OR IGNORE INTO ${table}(name) VALUES (?)`, [name]);
+  const { rows } = await sqlite3.execWithParams(db, `SELECT id FROM ${table} WHERE name = ?`, [name]);
+  return Number(rows[0][0]);
+}
+
+function lookupRowsToLookups(rows: unknown[][]): Lookup[] {
+  return rows.map((row) => ({ id: Number(row[0]), name: String(row[1]) }));
+}
+
+function listSql(): string {
+  return `SELECT
+    items.id AS id,
+    items.name AS name,
+    COALESCE(categories.name, '') AS category,
+    items.quantity AS quantity,
+    COALESCE(units.name, '') AS unit,
+    COALESCE(locations.name, '') AS location,
+    items.purchase_date AS purchase_date,
+    items.purchase_price AS purchase_price,
+    COALESCE(conditions.name, '') AS condition,
+    items.notes AS notes
+    FROM items
+    LEFT JOIN categories ON items.category_id = categories.id
+    LEFT JOIN locations ON items.location_id = locations.id
+    LEFT JOIN units ON items.unit_id = units.id
+    LEFT JOIN conditions ON items.condition_id = conditions.id
+    ORDER BY items.name`;
+}
+
 let tail: Promise<void> = Promise.resolve();
 
 ctx.onmessage = (event: MessageEvent) => {
@@ -56,43 +96,98 @@ async function handle(request: Request): Promise<void> {
 
     switch (request.type) {
       case 'list': {
-        const { rows, columns } = await sqlite3.execWithParams(db, 'SELECT * FROM items');
-        ctx.postMessage({ type: 'ok', requestId: request.requestId, data: rowsToItems(rows, columns) });
+        const { rows, columns } = await sqlite3.execWithParams(db, listSql());
+        ctx.postMessage({
+          type: 'ok',
+          requestId: request.requestId,
+          data: rowsToItems(rows, columns),
+        });
         break;
       }
+
       case 'insert': {
         const { item } = request;
+        const categoryId = await resolveLookup('categories', item.category);
+        const locationId = await resolveLookup('locations', item.location);
+        const unitId = await resolveLookup('units', item.unit);
+        const conditionId = await resolveLookup('conditions', item.condition);
         await sqlite3.run(
           db,
           `INSERT INTO items
-            (id, name, category, quantity, unit, location, purchase_date, purchase_price, condition, notes)
+            (id, name, category_id, quantity, unit_id, location_id, purchase_date, purchase_price, condition_id, notes)
             VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`,
           [
-            item.id, item.name, item.category, item.quantity, item.unit, item.location,
-            item.purchase_date, item.purchase_price, item.condition, item.notes,
+            item.id, item.name, categoryId, item.quantity, unitId, locationId,
+            item.purchase_date, item.purchase_price, conditionId, item.notes,
           ],
         );
         ctx.postMessage({ type: 'ok', requestId: request.requestId });
         break;
       }
+
       case 'update': {
         const { item } = request;
+        const categoryId = await resolveLookup('categories', item.category);
+        const locationId = await resolveLookup('locations', item.location);
+        const unitId = await resolveLookup('units', item.unit);
+        const conditionId = await resolveLookup('conditions', item.condition);
         await sqlite3.run(
           db,
           `UPDATE items SET
-            name = ?, category = ?, quantity = ?, unit = ?, location = ?,
-            purchase_date = ?, purchase_price = ?, condition = ?, notes = ?
+            name = ?, category_id = ?, quantity = ?, unit_id = ?, location_id = ?,
+            purchase_date = ?, purchase_price = ?, condition_id = ?, notes = ?
             WHERE id = ?`,
           [
-            item.name, item.category, item.quantity, item.unit, item.location,
-            item.purchase_date, item.purchase_price, item.condition, item.notes, item.id,
+            item.name, categoryId, item.quantity, unitId, locationId,
+            item.purchase_date, item.purchase_price, conditionId, item.notes, item.id,
           ],
         );
         ctx.postMessage({ type: 'ok', requestId: request.requestId });
         break;
       }
+
       case 'remove': {
         await sqlite3.run(db, 'DELETE FROM items WHERE id = ?', [request.id]);
+        ctx.postMessage({ type: 'ok', requestId: request.requestId });
+        break;
+      }
+
+      case 'getMeta': {
+        const meta: Record<string, Lookup[]> = {};
+        for (const table of LOOKUP_TABLES) {
+          const { rows } = await sqlite3.execWithParams(
+            db,
+            `SELECT id, name FROM ${table} ORDER BY name`,
+          );
+          meta[table] = lookupRowsToLookups(rows);
+        }
+        ctx.postMessage({ type: 'ok', requestId: request.requestId, data: meta });
+        break;
+      }
+
+      case 'lookupAdd': {
+        const id = await resolveLookup(request.table, request.name);
+        ctx.postMessage({
+          type: 'ok',
+          requestId: request.requestId,
+          data: { id: id as number, name: request.name },
+        });
+        break;
+      }
+
+      case 'lookupRename': {
+        await sqlite3.run(db, `UPDATE ${request.table} SET name = ? WHERE id = ?`, [
+          request.name,
+          request.id,
+        ]);
+        ctx.postMessage({ type: 'ok', requestId: request.requestId });
+        break;
+      }
+
+      case 'lookupRemove': {
+        const column = ITEM_COLUMN[request.table];
+        await sqlite3.run(db, `UPDATE items SET ${column} = NULL WHERE ${column} = ?`, [request.id]);
+        await sqlite3.run(db, `DELETE FROM ${request.table} WHERE id = ?`, [request.id]);
         ctx.postMessage({ type: 'ok', requestId: request.requestId });
         break;
       }

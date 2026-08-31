@@ -1,5 +1,6 @@
 import { z } from 'zod';
 import { ItemSchema } from '../domain/item';
+import { MetaSchema, LookupSchema, LookupTableSchema } from '../domain/lookup';
 
 export const ListRequest = z.object({
   type: z.literal('list'),
@@ -24,11 +25,42 @@ export const RemoveRequest = z.object({
   id: z.string(),
 });
 
+export const GetMetaRequest = z.object({
+  type: z.literal('getMeta'),
+  requestId: z.string(),
+});
+
+export const LookupAddRequest = z.object({
+  type: z.literal('lookupAdd'),
+  requestId: z.string(),
+  table: LookupTableSchema,
+  name: z.string().min(1),
+});
+
+export const LookupRenameRequest = z.object({
+  type: z.literal('lookupRename'),
+  requestId: z.string(),
+  table: LookupTableSchema,
+  id: z.number(),
+  name: z.string().min(1),
+});
+
+export const LookupRemoveRequest = z.object({
+  type: z.literal('lookupRemove'),
+  requestId: z.string(),
+  table: LookupTableSchema,
+  id: z.number(),
+});
+
 export const RequestSchema = z.discriminatedUnion('type', [
   ListRequest,
   InsertRequest,
   UpdateRequest,
   RemoveRequest,
+  GetMetaRequest,
+  LookupAddRequest,
+  LookupRenameRequest,
+  LookupRemoveRequest,
 ]);
 
 export type Request = z.infer<typeof RequestSchema>;
@@ -53,5 +85,7 @@ export const ResponseSchema = z.discriminatedUnion('type', [
 export type Response = z.infer<typeof ResponseSchema>;
 
 export const ListResult = z.array(ItemSchema);
-
 export type ListResult = z.infer<typeof ListResult>;
+
+export type MetaResult = z.infer<typeof MetaSchema>;
+export type LookupResult = z.infer<typeof LookupSchema>;
