@@ -37,7 +37,7 @@ test('categories persist across reload and appear in item autocomplete', async (
   // category shows up in the item form's datalist
   await page.goto('/#/');
   await expect(
-    page.locator('#item-category-options option[value="Electronics"]'),
+    page.locator('#item-category option[value="Electronics"]'),
   ).toHaveCount(1);
 });
 

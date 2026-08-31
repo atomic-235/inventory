@@ -54,37 +54,32 @@ function applyDefaults(prev: FormState, src: Item): FormState {
   return next;
 }
 
-type FieldDef = {
+function TextInput(props: {
   label: string;
   id: string;
-  key: keyof FormState;
+  value: string;
   type?: string;
   placeholder?: string;
-  options?: string[];
-};
-
-function Field(props: {
-  def: FieldDef;
-  value: string;
+  list?: string[];
   onInput: (value: string) => void;
+  onBlur?: () => void;
 }) {
-  const { def, value } = props;
-  const listId = def.options && def.options.length ? `${def.id}-options` : undefined;
-
+  const listId = props.list && props.list.length ? `${props.id}-list` : undefined;
   return (
     <div>
-      <label htmlFor={def.id}>{def.label}</label>
+      <label htmlFor={props.id}>{props.label}</label>
       <input
-        id={def.id}
-        type={def.type ?? 'text'}
-        value={value}
-        placeholder={def.placeholder}
+        id={props.id}
+        type={props.type ?? 'text'}
+        value={props.value}
+        placeholder={props.placeholder}
         list={listId}
         onInput={(e) => props.onInput(e.currentTarget.value)}
+        onBlur={props.onBlur}
       />
       {listId ? (
         <datalist id={listId}>
-          {def.options!.map((option) => (
+          {props.list!.map((option) => (
             <option value={option} />
           ))}
         </datalist>
@@ -93,35 +88,141 @@ function Field(props: {
   );
 }
 
+function ComboboxField(props: {
+  label: string;
+  id: string;
+  value: string;
+  options: string[];
+  onChange: (value: string) => void;
+}) {
+  const [creating, setCreating] = useState(false);
+  const { label, id, value, options, onChange } = props;
+
+  if (creating) {
+    return (
+      <div>
+        <label htmlFor={id}>{label}</label>
+        <div class="inline-create">
+          <input
+            id={id}
+            value={value}
+            placeholder={`New ${label.toLowerCase()}`}
+            onInput={(e) => onChange(e.currentTarget.value)}
+          />
+          <button type="button" onClick={() => setCreating(false)}>
+            Done
+          </button>
+        </div>
+      </div>
+    );
+  }
+
+  const opts = value && !options.includes(value) ? [value, ...options] : options;
+
+  return (
+    <div>
+      <label htmlFor={id}>{label}</label>
+      <div class="combobox">
+        <select
+          id={id}
+          value={value}
+          onChange={(e) => onChange(e.currentTarget.value)}
+        >
+          <option value="">—</option>
+          {opts.map((option) => (
+            <option key={option} value={option}>
+              {option}
+            </option>
+          ))}
+        </select>
+        <button type="button" aria-label={`Add ${label}`} onClick={() => setCreating(true)}>
+          +
+        </button>
+      </div>
+    </div>
+  );
+}
+
 function ItemForm(props: {
   form: FormState;
   onChange: (key: keyof FormState, value: string) => void;
+  onNameBlur: () => void;
   submitLabel: string;
   suggestions: Autocomplete;
   onSubmit: (e: Event) => void;
   onCancel?: () => void;
 }) {
-  const fields: FieldDef[] = [
-    { label: 'Name', id: 'item-name', key: 'name', placeholder: 'e.g. Sony TV', options: props.suggestions.names },
-    { label: 'Category', id: 'item-category', key: 'category', placeholder: 'e.g. Electronics', options: props.suggestions.categories },
-    { label: 'Quantity', id: 'item-quantity', key: 'quantity', type: 'number', placeholder: '1' },
-    { label: 'Unit', id: 'item-unit', key: 'unit', placeholder: 'e.g. pc, set, kg', options: props.suggestions.unitsFor(props.form.category) },
-    { label: 'Location', id: 'item-location', key: 'location', placeholder: 'e.g. Living Room', options: props.suggestions.locationsFor(props.form.category) },
-    { label: 'Purchase date', id: 'item-purchase-date', key: 'purchase_date', placeholder: 'YYYY-MM-DD' },
-    { label: 'Purchase price', id: 'item-purchase-price', key: 'purchase_price', type: 'number', placeholder: '0.00' },
-    { label: 'Condition', id: 'item-condition', key: 'condition', placeholder: 'e.g. new, good, used', options: props.suggestions.conditions },
-    { label: 'Notes', id: 'item-notes', key: 'notes', placeholder: 'any extra details' },
-  ];
+  const { form, suggestions, onChange } = props;
 
   return (
     <form onSubmit={props.onSubmit} aria-label="item-form">
-      {fields.map((def) => (
-        <Field
-          def={def}
-          value={props.form[def.key]}
-          onInput={(value) => props.onChange(def.key, value)}
-        />
-      ))}
+      <TextInput
+        label="Name"
+        id="item-name"
+        value={form.name}
+        placeholder="e.g. Sony TV"
+        list={suggestions.names}
+        onInput={(v) => onChange('name', v)}
+        onBlur={props.onNameBlur}
+      />
+      <ComboboxField
+        label="Category"
+        id="item-category"
+        value={form.category}
+        options={suggestions.categories}
+        onChange={(v) => onChange('category', v)}
+      />
+      <TextInput
+        label="Quantity"
+        id="item-quantity"
+        type="number"
+        value={form.quantity}
+        placeholder="1"
+        onInput={(v) => onChange('quantity', v)}
+      />
+      <ComboboxField
+        label="Unit"
+        id="item-unit"
+        value={form.unit}
+        options={suggestions.units}
+        onChange={(v) => onChange('unit', v)}
+      />
+      <ComboboxField
+        label="Location"
+        id="item-location"
+        value={form.location}
+        options={suggestions.locations}
+        onChange={(v) => onChange('location', v)}
+      />
+      <TextInput
+        label="Purchase date"
+        id="item-purchase-date"
+        type="date"
+        value={form.purchase_date}
+        onInput={(v) => onChange('purchase_date', v)}
+      />
+      <TextInput
+        label="Purchase price"
+        id="item-purchase-price"
+        type="number"
+        value={form.purchase_price}
+        placeholder="0.00"
+        onInput={(v) => onChange('purchase_price', v)}
+      />
+      <ComboboxField
+        label="Condition"
+        id="item-condition"
+        value={form.condition}
+        options={suggestions.conditions}
+        onChange={(v) => onChange('condition', v)}
+      />
+      <TextInput
+        label="Notes"
+        id="item-notes"
+        value={form.notes}
+        placeholder="any extra details"
+        onInput={(v) => onChange('notes', v)}
+      />
       <button type="submit">{props.submitLabel}</button>
       {props.onCancel ? (
         <button type="button" onClick={props.onCancel}>
@@ -147,6 +248,7 @@ export default function InventoryView() {
   const [editingId, setEditingId] = useState<string | null>(null);
   const [stage, setStage] = useState<'idle' | 'capturing' | 'extracting'>('idle');
   const [flowError, setFlowError] = useState<string | null>(null);
+  const [notice, setNotice] = useState<string | null>(null);
 
   const filtered = list.filter((i) => matches(i, query));
   const suggestions = buildAutocomplete(list, {
@@ -157,16 +259,13 @@ export default function InventoryView() {
   });
 
   function changeField(key: keyof FormState, value: string) {
+    setForm((prev) => ({ ...prev, [key]: value }));
+  }
+
+  function onNameBlur() {
     setForm((prev) => {
-      const next = { ...prev, [key]: value };
-      if (key === 'name') {
-        const known = findLastBy(list, 'name', value);
-        if (known) return applyDefaults(next, known);
-      } else if (key === 'category') {
-        const known = findLastBy(list, 'category', value);
-        if (known) return applyDefaults(next, known);
-      }
-      return next;
+      const known = findLastBy(list, 'name', prev.name);
+      return known ? applyDefaults(prev, known) : prev;
     });
   }
 
@@ -197,6 +296,8 @@ export default function InventoryView() {
     }
     setForm(toFormState({}));
     setEditingId(null);
+    setNotice(editingId ? 'Updated' : 'Saved');
+    window.setTimeout(() => setNotice(null), 2000);
   }
 
   function onEdit(item: Item) {
@@ -250,9 +351,12 @@ export default function InventoryView() {
 
       {error ? <p role="alert">{error}</p> : null}
 
+      {notice ? <p role="status">{notice}</p> : null}
+
       <ItemForm
         form={form}
         onChange={changeField}
+        onNameBlur={onNameBlur}
         submitLabel={editingId ? 'Update' : 'Add'}
         suggestions={suggestions}
         onSubmit={onSubmit}
