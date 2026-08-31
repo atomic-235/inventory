@@ -7,12 +7,13 @@ Personal home inventory app ("inventory"): a lightweight PWA tracking belongings
 
 ## Stack
 
-- Vite + vanilla TypeScript (no framework)
-- zod v4 (pydantic-equivalent schema validation, `z.toJSONSchema()`)
-- SQLite in-browser (planned: wa-sqlite on OPFS)
+- Vite + vanilla TypeScript (no framework) + Preact for UI
+- zod v4 (pydantic-equivalent schema validation, `z.toJSONSchema()`, `z.input`)
+- wa-sqlite on OPFS (dedicated worker) for storage
 - `getUserMedia` camera + `fetch` to an abstract OpenAI-compatible vision API (Venice)
 - Vitest (unit) + Playwright (E2E)
-- GitHub Pages (runtime server-independent via offline service worker)
+- GitHub Pages (runtime server-independent via offline service worker); deploy via
+  `.github/workflows/deploy.yml`. `base: './'` so it works under any GH Pages subpath.
 
 ## Commands
 
