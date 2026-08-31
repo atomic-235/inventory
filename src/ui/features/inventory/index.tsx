@@ -10,6 +10,7 @@ import { itemsToCsv } from '../../../domain/csv';
 import { buildAutocomplete, findLastBy } from '../../../domain/autocomplete';
 import type { Autocomplete } from '../../../domain/autocomplete';
 import { ItemTreeView } from './tree';
+import { itemPath } from '../../../domain/tree';
 import { ItemFieldsSchema } from '../../../domain/item';
 import type { Item, ItemFields } from '../../../domain/item';
 import { ZodError } from 'zod';
@@ -171,7 +172,7 @@ function ItemForm(props: {
   onNameBlur: () => void;
   submitLabel: string;
   suggestions: Autocomplete;
-  containers: { id: string; name: string }[];
+  containers: { id: string; name: string; path: string }[];
   onSubmit: (e: Event) => void;
   onCancel?: () => void;
 }) {
@@ -198,7 +199,7 @@ function ItemForm(props: {
           <option value="">—</option>
           {props.containers.map((c) => (
             <option key={c.id} value={c.id}>
-              {c.name}
+              {c.path}
             </option>
           ))}
         </select>
@@ -288,8 +289,8 @@ export default function InventoryView() {
 
   const containers = list
     .filter((i) => i.id !== editingId)
-    .map((i) => ({ id: i.id, name: i.name }))
-    .sort((a, b) => a.name.localeCompare(b.name));
+    .map((i) => ({ id: i.id, name: i.name, path: itemPath(i.id, list) }))
+    .sort((a, b) => a.path.localeCompare(b.path));
 
   const filtered = list.filter((i) => matches(i, query));
   const suggestions = buildAutocomplete(list, {

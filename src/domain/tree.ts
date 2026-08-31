@@ -34,3 +34,16 @@ export function buildTree(items: Item[]): ItemTree {
     childrenOf: (id: string) => byName(children.get(id) ?? []),
   };
 }
+
+export function itemPath(id: string, items: Item[]): string {
+  const byId = new Map(items.map((i) => [i.id, i]));
+  const names: string[] = [];
+  const seen = new Set<string>();
+  let current: Item | undefined = byId.get(id);
+  while (current && !seen.has(current.id)) {
+    seen.add(current.id);
+    names.push(current.name);
+    current = current.parent_id ? byId.get(current.parent_id) : undefined;
+  }
+  return names.reverse().join(' > ');
+}
