@@ -1,6 +1,7 @@
 import { render } from 'preact';
 import App from './app';
 import { db } from './db';
+import './style.css';
 
 declare global {
   interface Window {

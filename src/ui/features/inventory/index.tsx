@@ -153,25 +153,27 @@ export default function InventoryView() {
     <section id="inventory">
       <h2>Items</h2>
 
-      <input
-        type="search"
-        placeholder="Search"
-        aria-label="Search"
-        value={query}
-        onInput={(e) => setQuery(e.currentTarget.value)}
-      />
+      <div class="inventory-toolbar">
+        <input
+          type="search"
+          placeholder="Search"
+          aria-label="Search"
+          value={query}
+          onInput={(e) => setQuery(e.currentTarget.value)}
+        />
 
-      <button onClick={onAddByPhoto} disabled={stage !== 'idle'}>
-        {stage === 'capturing'
-          ? 'Capturing...'
-          : stage === 'extracting'
-            ? 'Extracting...'
-            : 'Add by photo'}
-      </button>
+        <button onClick={onAddByPhoto} disabled={stage !== 'idle'}>
+          {stage === 'capturing'
+            ? 'Capturing...'
+            : stage === 'extracting'
+              ? 'Extracting...'
+              : 'Add by photo'}
+        </button>
 
-      <button onClick={onExport} disabled={list.length === 0}>
-        Export CSV
-      </button>
+        <button onClick={onExport} disabled={list.length === 0}>
+          Export CSV
+        </button>
+      </div>
 
       {flowError ? <p role="alert">{flowError}</p> : null}
 
