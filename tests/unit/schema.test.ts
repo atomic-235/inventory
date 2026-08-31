@@ -1,5 +1,5 @@
 import { describe, it, expect } from 'vitest';
-import { ItemSchema, ItemFieldsSchema } from '../../src/schema';
+import { ItemSchema, ItemFieldsSchema } from '../../src/domain/item';
 
 describe('ItemSchema', () => {
   it('accepts a valid full item', () => {
