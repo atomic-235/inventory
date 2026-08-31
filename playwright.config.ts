@@ -6,6 +6,10 @@ export default defineConfig({
     baseURL: 'http://127.0.0.1:4173',
     launchOptions: {
       executablePath: process.env.INVENTORY_CHROMIUM,
+      args: [
+        '--use-fake-device-for-media-stream',
+        '--use-fake-ui-for-media-stream',
+      ],
     },
   },
   webServer: {

@@ -9,6 +9,7 @@ export function useItems(): ItemsState {
   const [state, setState] = useState<ItemsState>(items.get());
 
   useEffect(() => {
+    items.refresh();
     return items.subscribe(() => setState(items.get()));
   }, []);
 

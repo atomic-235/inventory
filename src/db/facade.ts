@@ -1,6 +1,6 @@
 import { ResponseSchema, ListResult } from './protocol';
 import type { Request } from './protocol';
-import type { Item, ItemFields } from '../domain/item';
+import type { Item, ItemFieldsInput } from '../domain/item';
 
 export interface Transport {
   postMessage(message: Request): void;
@@ -45,8 +45,8 @@ export class DbFacade {
     );
   }
 
-  insertItem(item: ItemFields): Promise<Item> {
-    const full: Item = { ...item, id: crypto.randomUUID() };
+  insertItem(item: ItemFieldsInput): Promise<Item> {
+    const full: Item = { ...item, id: crypto.randomUUID() } as Item;
     return this.request<unknown>({ type: 'insert', requestId: crypto.randomUUID(), item: full }).then(
       () => full,
     );

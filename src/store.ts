@@ -1,4 +1,4 @@
-import type { Item, ItemFields } from './domain/item';
+import type { Item, ItemFieldsInput } from './domain/item';
 
 type Listener = () => void;
 
@@ -35,7 +35,7 @@ export interface ItemsState {
 
 export interface ItemsDb {
   listItems(): Promise<Item[]>;
-  insertItem(fields: ItemFields): Promise<Item>;
+  insertItem(fields: ItemFieldsInput): Promise<Item>;
   updateItem(item: Item): Promise<Item>;
   removeItem(id: string): Promise<void>;
 }
@@ -59,7 +59,7 @@ export class ItemsStore extends Store<ItemsState> {
     }
   }
 
-  async add(fields: ItemFields): Promise<void> {
+  async add(fields: ItemFieldsInput): Promise<void> {
     await this.db.insertItem(fields);
     await this.refresh();
   }

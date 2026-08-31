@@ -18,3 +18,5 @@ export type Item = z.infer<typeof ItemSchema>;
 export const ItemFieldsSchema = ItemSchema.omit({ id: true });
 
 export type ItemFields = z.infer<typeof ItemFieldsSchema>;
+
+export type ItemFieldsInput = z.input<typeof ItemFieldsSchema>;

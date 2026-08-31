@@ -88,6 +88,15 @@ A non-TTY environment is NOT the cause of vite/Playwright hangs. Vite has no
 `isTTY` dependency on its startup path. The real causes were (a) the proxy above,
 (b) wrong baseURL port, (c) orphan port conflicts.
 
+### wa-sqlite worker must serialize SQLite operations
+`wa-sqlite`'s `Factory` allocates a single shared 8-byte return-value buffer
+(`Module._malloc(8)`), so two concurrent `sqlite3` calls on the JS side corrupt
+each other → `SQLITE_MISUSE` ("bad parameter or other API misuse"). The
+`db-worker` message handler MUST process one request at a time (a `tail = tail
+.then(() => handle(req))` promise chain), never let `onmessage` handlers run
+concurrently. Adding an on-mount `refresh()` that races an insert is what
+surfaced it.
+
 ## Secrets
 
 - API key is entered at runtime into browser localStorage, never committed or

@@ -4,6 +4,7 @@ import type { SQLiteAPI } from 'wa-sqlite';
 import { OriginPrivateFileSystemVFS } from 'wa-sqlite/src/examples/OriginPrivateFileSystemVFS.js';
 import { MIGRATIONS } from '../db/migrations';
 import { RequestSchema } from '../db/protocol';
+import type { Request } from '../db/protocol';
 import { ItemSchema } from '../domain/item';
 import type { Item } from '../domain/item';
 
@@ -42,9 +43,14 @@ function rowsToItems(rows: unknown[][], columns: string[]): Item[] {
   });
 }
 
-ctx.onmessage = async (event: MessageEvent) => {
-  const request = RequestSchema.parse(event.data);
+let tail: Promise<void> = Promise.resolve();
 
+ctx.onmessage = (event: MessageEvent) => {
+  const request = RequestSchema.parse(event.data);
+  tail = tail.then(() => handle(request));
+};
+
+async function handle(request: Request): Promise<void> {
   try {
     await ready;
 
@@ -98,4 +104,4 @@ ctx.onmessage = async (event: MessageEvent) => {
       message: err instanceof Error ? err.message : String(err),
     });
   }
-};
+}
