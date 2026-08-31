@@ -92,3 +92,14 @@ test('search filters items', async ({ page }) => {
   await expect(page.getByTestId('item-list')).toContainText('Camera');
   await expect(page.getByTestId('item-list')).not.toContainText('Lamp');
 });
+
+test('export csv downloads inventory.csv', async ({ page }) => {
+  await page.goto('/');
+  await seed(page, { name: 'Lamp', category: 'Furniture' });
+  await page.reload();
+
+  const downloadPromise = page.waitForEvent('download');
+  await page.getByRole('button', { name: 'Export CSV' }).click();
+  const download = await downloadPromise;
+  expect(download.suggestedFilename()).toBe('inventory.csv');
+});

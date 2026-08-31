@@ -2,6 +2,7 @@ import { useState } from 'preact/hooks';
 import { useItems, items } from '../../useItems';
 import { captureFrame } from '../../../data/camera';
 import { extractItem } from '../../../data/vision';
+import { itemsToCsv } from '../../../domain/csv';
 import { ItemFieldsSchema } from '../../../domain/item';
 import type { Item, ItemFields } from '../../../domain/item';
 
@@ -137,6 +138,17 @@ export default function InventoryView() {
     setEditing(null);
   }
 
+  function onExport() {
+    const csv = itemsToCsv(items.get().items);
+    const blob = new Blob([csv], { type: 'text/csv' });
+    const url = URL.createObjectURL(blob);
+    const a = document.createElement('a');
+    a.href = url;
+    a.download = 'inventory.csv';
+    a.click();
+    URL.revokeObjectURL(url);
+  }
+
   return (
     <section id="inventory">
       <h2>Items</h2>
@@ -155,6 +167,10 @@ export default function InventoryView() {
           : stage === 'extracting'
             ? 'Extracting...'
             : 'Add by photo'}
+      </button>
+
+      <button onClick={onExport} disabled={list.length === 0}>
+        Export CSV
       </button>
 
       {flowError ? <p role="alert">{flowError}</p> : null}
