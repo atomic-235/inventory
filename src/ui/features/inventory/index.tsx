@@ -5,6 +5,7 @@ import { db } from '../../../db';
 import { useMeta, meta } from '../../useMeta';
 import { captureFrame } from '../../../data/camera';
 import { extractItem } from '../../../data/vision';
+import { saveConfig } from '../../../data/config';
 import { itemsToCsv } from '../../../domain/csv';
 import { buildAutocomplete, findLastBy } from '../../../domain/autocomplete';
 import type { Autocomplete } from '../../../domain/autocomplete';
@@ -400,6 +401,8 @@ export default function InventoryView() {
       await db.importDatabase(bytes);
       await items.refresh();
       await meta.refresh();
+      const imported = await db.getSettings();
+      if (imported) saveConfig(imported);
       setNotice('Imported');
       window.setTimeout(() => setNotice(null), 2000);
     } catch (err) {
@@ -450,7 +453,7 @@ export default function InventoryView() {
           Export CSV
         </button>
 
-        <button onClick={onExportDb} disabled={list.length === 0}>
+        <button onClick={onExportDb}>
           Export SQLite
         </button>
 

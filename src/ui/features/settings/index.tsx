@@ -1,5 +1,6 @@
 import { useEffect, useState } from 'preact/hooks';
 import { loadConfig, saveConfig } from '../../../data/config';
+import { db } from '../../../db';
 
 export default function Settings() {
   const [baseUrl, setBaseUrl] = useState('');
@@ -14,10 +15,16 @@ export default function Settings() {
     setModel(cfg.model);
   }, []);
 
-  const onSubmit = (e: Event) => {
+  const onSubmit = async (e: Event) => {
     e.preventDefault();
-    saveConfig({ baseUrl, apiKey, model });
-    setStatus('Saved');
+    const cfg = { baseUrl, apiKey, model };
+    saveConfig(cfg);
+    try {
+      await db.saveSettings(cfg);
+      setStatus('Saved');
+    } catch (err) {
+      setStatus(err instanceof Error ? err.message : String(err));
+    }
   };
 
   return (

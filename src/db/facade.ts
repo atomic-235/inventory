@@ -1,8 +1,10 @@
 import { ResponseSchema, ListResult } from './protocol';
 import type { Request } from './protocol';
 import { MetaSchema, LookupSchema } from '../domain/lookup';
+import { SettingsSchema } from '../domain/settings';
 import type { Item, ItemFieldsInput } from '../domain/item';
 import type { Meta, Lookup, LookupTable } from '../domain/lookup';
+import type { ProviderConfig } from '../domain/settings';
 
 export interface Transport {
   postMessage(message: Request): void;
@@ -71,6 +73,23 @@ export class DbFacade {
     return this.request<unknown>({ type: 'getMeta', requestId: crypto.randomUUID() }).then((data) =>
       MetaSchema.parse(data),
     );
+  }
+
+  getSettings(): Promise<ProviderConfig | null> {
+    return this.request<unknown>({ type: 'getSettings', requestId: crypto.randomUUID() }).then(
+      (data) => {
+        if (data == null) return null;
+        return SettingsSchema.parse(JSON.parse(String(data)));
+      },
+    );
+  }
+
+  saveSettings(config: ProviderConfig): Promise<void> {
+    return this.request<unknown>({
+      type: 'saveSettings',
+      requestId: crypto.randomUUID(),
+      value: JSON.stringify(config),
+    }).then(() => undefined);
   }
 
   exportDatabase(): Promise<Uint8Array<ArrayBuffer>> {

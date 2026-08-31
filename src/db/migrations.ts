@@ -49,4 +49,10 @@ export const MIGRATIONS: string[] = [
 
   // v3: containment graph — self-referential parent FK (adjacency list)
   `ALTER TABLE items ADD COLUMN parent_id TEXT REFERENCES items(id) ON DELETE SET NULL;`,
+
+  // v4: app settings (key/value) so a full export/import carries config too
+  `CREATE TABLE IF NOT EXISTS app_settings (
+    key TEXT PRIMARY KEY,
+    value TEXT NOT NULL
+  );`,
 ];
