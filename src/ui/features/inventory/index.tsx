@@ -1,5 +1,6 @@
 import { useState } from 'preact/hooks';
 import { useItems, items } from '../../useItems';
+import { db } from '../../../db';
 import { useMeta } from '../../useMeta';
 import { captureFrame } from '../../../data/camera';
 import { extractItem } from '../../../data/vision';
@@ -343,6 +344,17 @@ export default function InventoryView() {
     URL.revokeObjectURL(url);
   }
 
+  async function onExportDb() {
+    const bytes = await db.exportDatabase();
+    const blob = new Blob([bytes], { type: 'application/x-sqlite3' });
+    const url = URL.createObjectURL(blob);
+    const a = document.createElement('a');
+    a.href = url;
+    a.download = 'inventory.sqlite';
+    a.click();
+    URL.revokeObjectURL(url);
+  }
+
   return (
     <section id="inventory">
       <h2>Items</h2>
@@ -366,6 +378,10 @@ export default function InventoryView() {
 
         <button onClick={onExport} disabled={list.length === 0}>
           Export CSV
+        </button>
+
+        <button onClick={onExportDb} disabled={list.length === 0}>
+          Export SQLite
         </button>
       </div>
 

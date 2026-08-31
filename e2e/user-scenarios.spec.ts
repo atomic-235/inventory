@@ -1,4 +1,5 @@
 import { test, expect } from '@playwright/test';
+import { readFileSync } from 'node:fs';
 import type { ItemFieldsInput } from '../src/domain/item';
 
 const CONFIG = { baseUrl: 'https://api.example.com/v1', apiKey: 'k', model: 'm' };
@@ -97,4 +98,21 @@ test('cancel edit restores add mode without modifying the item', async ({ page }
   await expect(page.getByLabel('Name')).toHaveValue('');
   await expect(page.getByTestId('item-list')).toContainText('Lamp');
   await expect(page.getByTestId('item-list')).not.toContainText('Floor Lamp');
+});
+
+// S6 — exporting the raw SQLite database produces a valid file a desktop tool can open.
+test('exports a valid SQLite database file', async ({ page }) => {
+  await page.goto('/');
+  await seed(page, { name: 'Lamp', category: 'Furniture', quantity: 1 });
+  await page.reload();
+
+  const downloadPromise = page.waitForEvent('download');
+  await page.getByRole('button', { name: 'Export SQLite' }).click();
+  const download = await downloadPromise;
+
+  expect(download.suggestedFilename()).toBe('inventory.sqlite');
+
+  const buf = readFileSync((await download.path()) as string);
+  expect(buf.subarray(0, 16).toString('ascii')).toBe('SQLite format 3\u0000');
+  expect(buf.toString('utf8')).toContain('Lamp');
 });

@@ -152,6 +152,22 @@ async function handle(request: Request): Promise<void> {
         break;
       }
 
+      case 'export': {
+        const filename = 'export.sqlite';
+        await sqlite3.run(db, `VACUUM INTO '${filename}'`);
+        const root = await navigator.storage.getDirectory();
+        const handle = await root.getFileHandle(filename);
+        const file = await handle.getFile();
+        const bytes = new Uint8Array(await file.arrayBuffer());
+        await root.removeEntry(filename);
+        ctx.postMessage({
+          type: 'ok',
+          requestId: request.requestId,
+          data: bytes,
+        });
+        break;
+      }
+
       case 'getMeta': {
         const meta: Record<string, Lookup[]> = {};
         for (const table of LOOKUP_TABLES) {

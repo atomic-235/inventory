@@ -73,6 +73,15 @@ export class DbFacade {
     );
   }
 
+  exportDatabase(): Promise<Uint8Array<ArrayBuffer>> {
+    return this.request<unknown>({ type: 'export', requestId: crypto.randomUUID() }).then((data) => {
+      if (!(data instanceof Uint8Array)) {
+        throw new Error('Unexpected export payload');
+      }
+      return data as Uint8Array<ArrayBuffer>;
+    });
+  }
+
   addLookup(table: LookupTable, name: string): Promise<Lookup> {
     return this.request<unknown>({ type: 'lookupAdd', requestId: crypto.randomUUID(), table, name }).then(
       (data) => LookupSchema.parse(data),
