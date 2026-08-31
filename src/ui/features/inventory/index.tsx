@@ -8,6 +8,7 @@ import { buildAutocomplete, findLastBy } from '../../../domain/autocomplete';
 import type { Autocomplete } from '../../../domain/autocomplete';
 import { ItemFieldsSchema } from '../../../domain/item';
 import type { Item, ItemFields } from '../../../domain/item';
+import { ZodError } from 'zod';
 
 type FormState = {
   name: string;
@@ -41,6 +42,18 @@ function formToFields(form: FormState): ItemFields {
     quantity: form.quantity === '' ? 1 : form.quantity,
     purchase_price: form.purchase_price === '' ? null : form.purchase_price,
   });
+}
+
+function friendlyError(err: unknown): string {
+  if (err instanceof ZodError) {
+    const issue = err.issues[0];
+    const key = issue ? String(issue.path[0] ?? '') : '';
+    if (key === 'name') return 'Name is required.';
+    if (key === 'quantity') return 'Quantity must be a positive whole number.';
+    if (key === 'purchase_price') return 'Purchase price cannot be negative.';
+    return 'Please check the highlighted fields.';
+  }
+  return String(err);
 }
 
 function applyDefaults(prev: FormState, src: Item): FormState {
@@ -249,6 +262,7 @@ export default function InventoryView() {
   const [stage, setStage] = useState<'idle' | 'capturing' | 'extracting'>('idle');
   const [flowError, setFlowError] = useState<string | null>(null);
   const [notice, setNotice] = useState<string | null>(null);
+  const [formError, setFormError] = useState<string | null>(null);
 
   const filtered = list.filter((i) => matches(i, query));
   const suggestions = buildAutocomplete(list, {
@@ -259,6 +273,7 @@ export default function InventoryView() {
   });
 
   function changeField(key: keyof FormState, value: string) {
+    setFormError(null);
     setForm((prev) => ({ ...prev, [key]: value }));
   }
 
@@ -287,7 +302,14 @@ export default function InventoryView() {
 
   function onSubmit(e: Event) {
     e.preventDefault();
-    const fields = formToFields(form);
+    setFormError(null);
+    let fields: ItemFields;
+    try {
+      fields = formToFields(form);
+    } catch (err) {
+      setFormError(friendlyError(err));
+      return;
+    }
     if (editingId) {
       const existing = list.find((i) => i.id === editingId);
       if (existing) items.update({ ...existing, ...fields });
@@ -350,6 +372,8 @@ export default function InventoryView() {
       {flowError ? <p role="alert">{flowError}</p> : null}
 
       {error ? <p role="alert">{error}</p> : null}
+
+      {formError ? <p role="alert">{formError}</p> : null}
 
       {notice ? <p role="status">{notice}</p> : null}
 

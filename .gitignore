@@ -4,6 +4,7 @@ dist/
 .cache/
 .direnv/
 test-results/
+.playwright-mcp/
 *.local
 .env
 .env.*
