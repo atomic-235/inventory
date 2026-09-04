@@ -33,6 +33,11 @@ cycle-guard) so an agent can talk to the live SQLite DB "as if from the TUI".
 - `add_item`/`update_item` accept `parent` (container item name, resolved to id)
   or `parent_id` (UUID); category/unit/condition are free strings auto-resolved
   as lookups, same as the TUI.
+- **Parent name resolution** (`resolveParent` in `packages/mcp/src/index.ts`):
+  exact case-insensitive match first, else the first item whose lowercase name
+  `.includes()` the query (substring). This is ambiguous when several items share
+  a name (e.g. two `Bambu Lab A1 Mini`) — always pass `parent_id` in that case,
+  and add containers **before** their children.
 - DB path: `~/.local/share/inventory/inventory.db` (respects `XDG_DATA_HOME`).
 - The server exposes **tools only, no resources**, so it will NOT show up in
   `list_mcp_resources` — that only lists resource-bearing servers. Don't conclude
@@ -40,6 +45,8 @@ cycle-guard) so an agent can talk to the live SQLite DB "as if from the TUI".
 - `packages/tui/package.json` gained an `exports` map (`./db`, `./config`) solely
   so the MCP can import the live `Db`; keep it when touching tui.
 - Rebuild/restart opencode after changing the server or `opencode.json`.
+- MCP edits do NOT auto-refresh a running TUI. The TUI has a manual refresh: press
+  `R` in the list/tree view (re-reads items; also re-reads lookups in `m`anage).
 
 ## Commands
 
@@ -123,6 +130,40 @@ each other → `SQLITE_MISUSE` ("bad parameter or other API misuse"). The
 .then(() => handle(req))` promise chain), never let `onmessage` handlers run
 concurrently. Adding an on-mount `refresh()` that races an insert is what
 surfaced it.
+
+### Data-loss incident: `replaceItems` must be atomic + backed up
+An early `syncCloud` wiped the items table. Root cause: `Db.replaceItems` did a
+bare `DELETE FROM items` then re-inserted in `mergeItems` order (sorted by UUID).
+Because `parent_id` self-references `items(id)` with `ON DELETE SET NULL`, a child
+whose parent sorted *after* it triggered `FOREIGN KEY constraint failed` mid-insert
+— but the `DELETE` had already committed, leaving the table nearly empty.
+
+Fixes (both committed):
+- `replaceItems` now runs in `BEGIN`/`COMMIT`/`ROLLBACK` and does a **two-pass**
+  insert: all rows with `parent_id = NULL`, then a second `UPDATE` to set parents
+  once every row exists. This keeps FK enforcement on and handles any ordering.
+- `sync.ts` snapshots the DB (`inventory.db.bak-<ms>`, a self-contained VACUUM
+  copy) before `replaceItems` and before `restoreCloud` overwrites the file.
+
+Rules going forward: never `DELETE`-then-`INSERT` without a transaction; never do
+a destructive rewrite without first writing a backup snapshot.
+
+### `items.id` has no DB default
+`id TEXT PRIMARY KEY` is generated in app code (`Db.insertItem` uses
+`randomUUID()`). Raw SQL `INSERT INTO items ...` must supply a UUID explicitly or
+rows get `id = NULL`, breaking containment/path. Prefer `Db.insertItem`.
+
+### Container naming convention (rooms/properties)
+Room containers are named `<code> <CapitalWord> room`, lowercase "room" word:
+`N2 Living room`, `KL Living room`, `N2 Bedroom` (`N2` = nook 2, `KL` = Kolpino).
+Properties are `Property, City, Country` (e.g. `Flat, Kolpino, Russia`). Keep it.
+
+### Sync after re-adding can produce duplicates
+`mergeItems` unions by `id`. If you reconstruct wiped items with fresh
+`randomUUID()` ids and then sync against a remote blob that still has the old ids,
+**both copies survive** (different ids) → e.g. two `The Nook 2` roots. Watch for
+orphan duplicates after a recovery: they look like a root item with empty notes
+and no children (the re-added copy has the notes + children). Remove the orphan.
 
 ## Secrets
 

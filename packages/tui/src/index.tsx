@@ -531,6 +531,12 @@ function App({ db }: { db: Db }) {
       })();
       return;
     }
+    if (input === 'R') {
+      refresh();
+      if (view === 'manage') setLookups(db.listLookups(table));
+      setStatus('refreshed');
+      return;
+    }
     if (input === 't') {
       setView((v) => (v === 'tree' ? 'list' : 'tree'));
       setSelect(0);
@@ -652,7 +658,7 @@ function App({ db }: { db: Db }) {
           </Text>
         ))
       )}
-      <Text color="gray">↑/↓ nav · Enter edit · a add · d delete · t tree · / search · m manage · s sync · r restore · q quit</Text>
+      <Text color="gray">↑/↓ nav · Enter edit · a add · d delete · t tree · / search · m manage · s sync · r restore · R refresh · q quit</Text>
       {status ? <Text color="gray">{status}</Text> : null}
     </Box>
   );
