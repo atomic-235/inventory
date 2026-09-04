@@ -19,6 +19,13 @@ function setAt(arr: string[], i: number, v: string): string[] {
   return next;
 }
 
+function cleanInput(input: string, key: { ctrl?: boolean; meta?: boolean }): string {
+  if (input === '' || key.ctrl || key.meta) return '';
+  return input
+    .replace(/\u001b\[[0-9;?]*[a-zA-Z~]/g, '')
+    .replace(/[\u0000-\u001f\u007f]/g, '');
+}
+
 function Prompt(props: {
   label: string;
   initial: string;
@@ -26,25 +33,52 @@ function Prompt(props: {
   onCancel: () => void;
 }) {
   const [value, setValue] = useState(props.initial);
+  const [cursor, setCursor] = useState(props.initial.length);
   useInput((input, key) => {
     if (key.escape) props.onCancel();
     else if (key.return) props.onSubmit(value);
-    else if (key.backspace) setValue((v) => v.slice(0, -1));
-    else if (input && input.length === 1 && !key.ctrl && !key.meta) setValue((v) => v + input);
+    else if (key.leftArrow) setCursor((c) => Math.max(0, c - 1));
+    else if (key.rightArrow) setCursor((c) => Math.min(value.length, c + 1));
+    else if (key.backspace || key.delete) {
+      if (cursor > 0) {
+        setValue((v) => v.slice(0, cursor - 1) + v.slice(cursor));
+        setCursor((c) => c - 1);
+      }
+    } else {
+      const ch = cleanInput(input, key);
+      if (ch) {
+        setValue((v) => v.slice(0, cursor) + ch + v.slice(cursor));
+        setCursor((c) => c + ch.length);
+      }
+    }
   });
   return (
     <Box flexDirection="column">
       <Text>
-        {props.label}: <Text color="cyan">{value}</Text>
+        {props.label}:{' '}
+        <Text color="cyan">
+          {value.slice(0, cursor)}
+          <Text inverse>{value[cursor] ?? ' '}</Text>
+          {value.slice(cursor + 1)}
+        </Text>
       </Text>
       <Text color="gray">Enter=confirm  Esc=cancel</Text>
     </Box>
   );
 }
 
+const LOOKUP_FIELD: Record<number, LookupTable> = {
+  1: 'categories',
+  3: 'units',
+  6: 'conditions',
+};
+const SUGGEST_KEYS = new Set([0, 1, 3, 6]);
+
 function ItemForm(props: {
   initial: Partial<Item>;
   items: Item[];
+  options: { categories: string[]; units: string[]; conditions: string[] };
+  onAddLookup: (table: LookupTable, name: string) => void;
   submitLabel: string;
   onSubmit: (data: {
     name: string;
@@ -71,6 +105,30 @@ function ItemForm(props: {
     init.notes ?? '',
   ]);
   const [focus, setFocus] = useState(0);
+  const [cursor, setCursor] = useState(0);
+  const [creating, setCreating] = useState<null | { field: number; prev: string }>(null);
+
+  const moveFocus = (f: number) => {
+    setFocus(f);
+    setCursor(f < values.length ? values[f].length : 0);
+  };
+
+  const suggestOptions = (f: number): string[] => {
+    if (f === 0) return [...new Set(props.items.map((i) => i.name))].sort();
+    if (f === 1) return props.options.categories;
+    if (f === 3) return props.options.units;
+    if (f === 6) return props.options.conditions;
+    return [];
+  };
+
+  const completionFor = (f: number): string | null => {
+    const v = values[f];
+    if (!v) return null;
+    const cand = suggestOptions(f)
+      .filter((o) => o.toLowerCase().startsWith(v.toLowerCase()) && o.length > v.length)
+      .sort((a, b) => a.localeCompare(b))[0];
+    return cand ?? null;
+  };
 
   const containers = [
     { id: '', label: '(none)' },
@@ -100,41 +158,139 @@ function ItemForm(props: {
   };
 
   useInput((input, key) => {
+    if (creating && creating.field === focus) {
+      if (key.escape) {
+        setValues((v) => setAt(v, creating.field, creating.prev));
+        setCreating(null);
+        return;
+      }
+      if (key.return) {
+        const name = values[creating.field].trim();
+        if (name) props.onAddLookup(LOOKUP_FIELD[creating.field], name);
+        setValues((v) => setAt(v, creating.field, name));
+        setCreating(null);
+        return;
+      }
+      if (key.leftArrow) setCursor((c) => Math.max(0, c - 1));
+      else if (key.rightArrow) setCursor((c) => Math.min(values[focus].length, c + 1));
+      else if (key.backspace || key.delete) {
+        if (cursor > 0) {
+          setValues((v) => setAt(v, focus, v[focus].slice(0, cursor - 1) + v[focus].slice(cursor)));
+          setCursor((c) => c - 1);
+        }
+      } else {
+        const ch = cleanInput(input, key);
+        if (ch) {
+          setValues((v) => setAt(v, focus, v[focus].slice(0, cursor) + ch + v[focus].slice(cursor)));
+          setCursor((c) => c + ch.length);
+        }
+      }
+      return;
+    }
+
     if (key.escape) {
       props.onCancel();
       return;
     }
     if (key.return) {
       if (focus === 8) submit();
-      else setFocus(focus + 1);
+      else moveFocus(focus + 1);
       return;
     }
     if (focus === 8) {
       if (key.leftArrow) setCi((i) => (i + containers.length - 1) % containers.length);
       else if (key.rightArrow) setCi((i) => (i + 1) % containers.length);
-      else if (key.tab) setFocus(0);
-      else if (key.upArrow) setFocus(7);
-      else if (key.downArrow) setFocus(0);
+      else if (key.tab) moveFocus(0);
+      else if (key.upArrow) moveFocus(7);
+      else if (key.downArrow) moveFocus(0);
       return;
     }
-    if (key.tab || key.downArrow) setFocus((focus + 1) % 9);
-    else if (key.upArrow) setFocus((focus + 8) % 9);
-    else if (key.backspace) setValues((v) => setAt(v, focus, v[focus].slice(0, -1)));
-    else if (input && input.length === 1 && !key.ctrl && !key.meta)
-      setValues((v) => setAt(v, focus, v[focus] + input));
+    if (input === '+' && LOOKUP_FIELD[focus]) {
+      setCreating({ field: focus, prev: values[focus] });
+      setValues((v) => setAt(v, focus, ''));
+      setCursor(0);
+      return;
+    }
+    if (key.tab) {
+      const m = completionFor(focus);
+      if (m) {
+        setValues((v) => setAt(v, focus, m));
+        setCursor(m.length);
+      } else {
+        moveFocus((focus + 1) % 9);
+      }
+      return;
+    }
+    if (key.downArrow) moveFocus((focus + 1) % 9);
+    else if (key.upArrow) moveFocus((focus + 8) % 9);
+    else if (key.leftArrow) setCursor((c) => Math.max(0, c - 1));
+    else if (key.rightArrow) setCursor((c) => Math.min(values[focus].length, c + 1));
+    else if (key.backspace || key.delete) {
+      if (cursor > 0) {
+        setValues((v) => setAt(v, focus, v[focus].slice(0, cursor - 1) + v[focus].slice(cursor)));
+        setCursor((c) => c - 1);
+      }
+    } else {
+      const ch = cleanInput(input, key);
+      if (ch) {
+        setValues((v) => setAt(v, focus, v[focus].slice(0, cursor) + ch + v[focus].slice(cursor)));
+        setCursor((c) => c + ch.length);
+      }
+    }
   });
+
+  const fieldBody = (i: number, val: string): React.ReactNode => {
+    const isF = focus === i;
+    const creatingHere = creating != null && creating.field === i;
+    if (creatingHere) {
+      return (
+        <Text color="yellow">
+          {val.slice(0, cursor)}
+          <Text inverse>{val[cursor] ?? ' '}</Text>
+          {val.slice(cursor + 1)}
+        </Text>
+      );
+    }
+    if (isF && SUGGEST_KEYS.has(i) && cursor === val.length) {
+      const rest = completionFor(i)?.slice(val.length);
+      return (
+        <Text color="cyan">
+          {val}
+          {rest ? <Text color="gray">{rest}</Text> : <Text inverse> </Text>}
+        </Text>
+      );
+    }
+    if (isF) {
+      return (
+        <Text color="cyan">
+          {val.slice(0, cursor)}
+          <Text inverse>{val[cursor] ?? ' '}</Text>
+          {val.slice(cursor + 1)}
+        </Text>
+      );
+    }
+    return <Text>{val || '—'}</Text>;
+  };
 
   return (
     <Box flexDirection="column">
       <Text bold>
-        {props.submitLabel} item <Text color="gray">(Enter=next/save · Esc=cancel · ↑/↓ move)</Text>
+        {props.submitLabel} item{' '}
+        <Text color="gray">(Enter=next/save · Esc=cancel · ↑/↓ move · Tab=autocomplete · + new)</Text>
       </Text>
-      {FIELD_LABELS.map((label, i) => (
-        <Text key={label}>
-          {focus === i ? <Text color="cyan">›</Text> : ' '} {label}:{' '}
-          <Text color={focus === i ? 'cyan' : undefined}>{values[i] || '—'}</Text>
-        </Text>
-      ))}
+      {FIELD_LABELS.map((label, i) => {
+        const isF = focus === i;
+        const hint =
+          isF && LOOKUP_FIELD[i] ? (
+            <Text color="gray">  (+ new)</Text>
+          ) : null;
+        return (
+          <Text key={label}>
+            {isF ? <Text color="cyan">›</Text> : ' '} {label}: {fieldBody(i, values[i])}
+            {hint}
+          </Text>
+        );
+      })}
       <Text>
         {focus === 8 ? <Text color="cyan">›</Text> : ' '} Container:{' '}
         <Text color={focus === 8 ? 'cyan' : undefined}>{containers[ci].label}</Text>{' '}
@@ -186,8 +342,9 @@ function App({ db }: { db: Db }) {
         setSearching(false);
       } else if (key.backspace) {
         setQuery((q) => q.slice(0, -1));
-      } else if (input && input.length === 1 && !key.ctrl && !key.meta) {
-        setQuery((q) => q + input);
+      } else {
+        const ch = cleanInput(input, key);
+        if (ch) setQuery((q) => q + ch);
       }
       return;
     }
@@ -320,6 +477,12 @@ function App({ db }: { db: Db }) {
       <ItemForm
         initial={initial}
         items={items}
+        options={{
+          categories: db.listLookups('categories').map((l) => l.name),
+          units: db.listLookups('units').map((l) => l.name),
+          conditions: db.listLookups('conditions').map((l) => l.name),
+        }}
+        onAddLookup={(table, name) => db.addLookup(table, name)}
         submitLabel={form.kind === 'edit' ? 'Save' : 'Add'}
         onSubmit={(data) => {
           if (data.name === '') {
