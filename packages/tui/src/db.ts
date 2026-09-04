@@ -147,27 +147,37 @@ export class Db {
   }
 
   replaceItems(items: Item[]): void {
-    this.db.exec('DELETE FROM items');
-    const insert = this.db.prepare(
-      `INSERT INTO items
-        (id, name, category_id, quantity, unit_id, purchase_date, purchase_price, condition_id, notes, parent_id, updated_at, deleted_at)
-        VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`,
-    );
-    for (const it of items) {
-      insert.run(
-        it.id,
-        it.name,
-        this.resolveLookup('categories', it.category),
-        it.quantity,
-        this.resolveLookup('units', it.unit),
-        it.purchase_date,
-        it.purchase_price,
-        this.resolveLookup('conditions', it.condition),
-        it.notes,
-        it.parent_id,
-        it.updated_at,
-        it.deleted_at,
+    this.db.exec('BEGIN');
+    try {
+      this.db.exec('DELETE FROM items');
+      const insert = this.db.prepare(
+        `INSERT INTO items
+          (id, name, category_id, quantity, unit_id, purchase_date, purchase_price, condition_id, notes, parent_id, updated_at, deleted_at)
+          VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, NULL, ?, ?)`,
       );
+      for (const it of items) {
+        insert.run(
+          it.id,
+          it.name,
+          this.resolveLookup('categories', it.category),
+          it.quantity,
+          this.resolveLookup('units', it.unit),
+          it.purchase_date,
+          it.purchase_price,
+          this.resolveLookup('conditions', it.condition),
+          it.notes,
+          it.updated_at,
+          it.deleted_at,
+        );
+      }
+      const setParent = this.db.prepare('UPDATE items SET parent_id = ? WHERE id = ?');
+      for (const it of items) {
+        if (it.parent_id) setParent.run(it.parent_id, it.id);
+      }
+      this.db.exec('COMMIT');
+    } catch (e) {
+      this.db.exec('ROLLBACK');
+      throw e;
     }
   }
 
