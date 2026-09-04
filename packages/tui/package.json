@@ -3,6 +3,10 @@
   "version": "0.0.0",
   "private": true,
   "type": "module",
+  "exports": {
+    "./db": "./src/db.ts",
+    "./config": "./src/config.ts"
+  },
   "scripts": {
     "start": "NODE_OPTIONS=--no-warnings tsx src/index.tsx",
     "dev": "NODE_OPTIONS=--no-warnings tsx watch src/index.tsx",

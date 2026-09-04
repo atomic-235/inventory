@@ -14,6 +14,32 @@ Personal home inventory app ("inventory"): a lightweight PWA tracking belongings
 - Vitest (unit) + Playwright (E2E)
 - GitHub Pages (runtime server-independent via offline service worker); deploy via
   `.github/workflows/deploy.yml`. `base: './'` so it works under any GH Pages subpath.
+- pnpm monorepo: `packages/core` (`@inventory/core`, browser-safe domain logic),
+  `packages/tui` (`@inventory/tui`, Ink TUI + node:sqlite `Db`), `packages/mcp`
+  (`@inventory/mcp`, stdio MCP server wrapping the TUI's `Db`).
+
+## MCP server (`packages/mcp`)
+
+A local stdio MCP server registered in `opencode.json` under the name
+`inventory`. It re-exposes the TUI's exact DB operations (`Db` from
+`@inventory/tui/db`, same migrations, auto-resolving lookups, tombstones,
+cycle-guard) so an agent can talk to the live SQLite DB "as if from the TUI".
+
+- Tool names are prefixed `inventory_` when called: `inventory_list_items`,
+  `inventory_list_all_items`, `inventory_get_item`, `inventory_find_items`,
+  `inventory_add_item`, `inventory_update_item`, `inventory_remove_item`,
+  `inventory_list_lookups`, `inventory_add_lookup`, `inventory_rename_lookup`,
+  `inventory_remove_lookup`, `inventory_tree`.
+- `add_item`/`update_item` accept `parent` (container item name, resolved to id)
+  or `parent_id` (UUID); category/unit/condition are free strings auto-resolved
+  as lookups, same as the TUI.
+- DB path: `~/.local/share/inventory/inventory.db` (respects `XDG_DATA_HOME`).
+- The server exposes **tools only, no resources**, so it will NOT show up in
+  `list_mcp_resources` — that only lists resource-bearing servers. Don't conclude
+  the server is disconnected from that.
+- `packages/tui/package.json` gained an `exports` map (`./db`, `./config`) solely
+  so the MCP can import the live `Db`; keep it when touching tui.
+- Rebuild/restart opencode after changing the server or `opencode.json`.
 
 ## Commands
 

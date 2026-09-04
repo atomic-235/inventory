@@ -26,6 +26,36 @@ function cleanInput(input: string, key: { ctrl?: boolean; meta?: boolean }): str
     .replace(/[\u0000-\u001f\u007f]/g, '');
 }
 
+function fuzzyBest(query: string, options: string[]): { option: string; prefix: boolean } | null {
+  if (!query) return null;
+  const q = query.toLowerCase();
+  let best: string | null = null;
+  let bestScore = -1;
+  let bestPrefix = false;
+  for (const o of options) {
+    const ol = o.toLowerCase();
+    if (ol === q) continue;
+    let score = -1;
+    let prefix = false;
+    if (ol.startsWith(q)) {
+      score = 10000 - ol.length;
+      prefix = true;
+    } else if (ol.includes(q)) {
+      score = 5000 - ol.length;
+    } else {
+      let qi = 0;
+      for (let i = 0; i < ol.length && qi < q.length; i++) if (ol[i] === q[qi]) qi++;
+      if (qi === q.length) score = 1000 - ol.length;
+    }
+    if (score > bestScore) {
+      bestScore = score;
+      best = o;
+      bestPrefix = prefix;
+    }
+  }
+  return best ? { option: best, prefix: bestPrefix } : null;
+}
+
 function Prompt(props: {
   label: string;
   initial: string;
@@ -108,9 +138,21 @@ function ItemForm(props: {
   const [cursor, setCursor] = useState(0);
   const [creating, setCreating] = useState<null | { field: number; prev: string }>(null);
 
+  const containers = [
+    { id: '', label: '(none)' },
+    ...props.items
+      .filter((i) => i.id !== init.id)
+      .map((i) => ({ id: i.id, label: itemPath(i.id, props.items) })),
+  ];
+  const containerLabels = containers.map((c) => c.label);
+  const [container, setContainer] = useState(() => {
+    const idx = containers.findIndex((c) => c.id === (init.parent_id ?? ''));
+    return containers[idx >= 0 ? idx : 0].label;
+  });
+
   const moveFocus = (f: number) => {
     setFocus(f);
-    setCursor(f < values.length ? values[f].length : 0);
+    setCursor(f < values.length ? values[f].length : container.length);
   };
 
   const suggestOptions = (f: number): string[] => {
@@ -121,25 +163,8 @@ function ItemForm(props: {
     return [];
   };
 
-  const completionFor = (f: number): string | null => {
-    const v = values[f];
-    if (!v) return null;
-    const cand = suggestOptions(f)
-      .filter((o) => o.toLowerCase().startsWith(v.toLowerCase()) && o.length > v.length)
-      .sort((a, b) => a.localeCompare(b))[0];
-    return cand ?? null;
-  };
-
-  const containers = [
-    { id: '', label: '(none)' },
-    ...props.items
-      .filter((i) => i.id !== init.id)
-      .map((i) => ({ id: i.id, label: itemPath(i.id, props.items) })),
-  ];
-  const [ci, setCi] = useState(() => {
-    const idx = containers.findIndex((c) => c.id === (init.parent_id ?? ''));
-    return idx >= 0 ? idx : 0;
-  });
+  const completionFor = (f: number): { option: string; prefix: boolean } | null =>
+    fuzzyBest(values[f], suggestOptions(f));
 
   const submit = () => {
     const qty = parseInt(values[2], 10);
@@ -153,7 +178,7 @@ function ItemForm(props: {
       purchase_price: price != null && Number.isFinite(price) ? price : null,
       condition: values[6].trim(),
       notes: values[7].trim(),
-      parent_id: containers[ci].id || null,
+      parent_id: containers.find((c) => c.label === container.trim())?.id || null,
     });
   };
 
@@ -198,11 +223,30 @@ function ItemForm(props: {
       return;
     }
     if (focus === 8) {
-      if (key.leftArrow) setCi((i) => (i + containers.length - 1) % containers.length);
-      else if (key.rightArrow) setCi((i) => (i + 1) % containers.length);
-      else if (key.tab) moveFocus(0);
-      else if (key.upArrow) moveFocus(7);
+      if (key.leftArrow) setCursor((c) => Math.max(0, c - 1));
+      else if (key.rightArrow) setCursor((c) => Math.min(container.length, c + 1));
+      else if (key.backspace || key.delete) {
+        if (cursor > 0) {
+          setContainer((v) => v.slice(0, cursor - 1) + v.slice(cursor));
+          setCursor((c) => c - 1);
+        }
+      } else if (key.tab) {
+        const c = fuzzyBest(container, containerLabels);
+        if (c) {
+          setContainer(c.option);
+          setCursor(c.option.length);
+        } else {
+          moveFocus(0);
+        }
+      } else if (key.upArrow) moveFocus(7);
       else if (key.downArrow) moveFocus(0);
+      else {
+        const ch = cleanInput(input, key);
+        if (ch) {
+          setContainer((v) => v.slice(0, cursor) + ch + v.slice(cursor));
+          setCursor((c) => c + ch.length);
+        }
+      }
       return;
     }
     if (input === '+' && LOOKUP_FIELD[focus]) {
@@ -212,10 +256,10 @@ function ItemForm(props: {
       return;
     }
     if (key.tab) {
-      const m = completionFor(focus);
-      if (m) {
-        setValues((v) => setAt(v, focus, m));
-        setCursor(m.length);
+      const c = completionFor(focus);
+      if (c) {
+        setValues((v) => setAt(v, focus, c.option));
+        setCursor(c.option.length);
       } else {
         moveFocus((focus + 1) % 9);
       }
@@ -252,11 +296,27 @@ function ItemForm(props: {
       );
     }
     if (isF && SUGGEST_KEYS.has(i) && cursor === val.length) {
-      const rest = completionFor(i)?.slice(val.length);
+      const c = completionFor(i);
+      if (c && c.prefix) {
+        return (
+          <Text color="cyan">
+            {val}
+            <Text color="gray">{c.option.slice(val.length)}</Text>
+          </Text>
+        );
+      }
+      if (c) {
+        return (
+          <Text color="cyan">
+            {val}
+            <Text color="gray">  → {c.option}</Text>
+          </Text>
+        );
+      }
       return (
         <Text color="cyan">
           {val}
-          {rest ? <Text color="gray">{rest}</Text> : <Text inverse> </Text>}
+          <Text inverse> </Text>
         </Text>
       );
     }
@@ -293,8 +353,39 @@ function ItemForm(props: {
       })}
       <Text>
         {focus === 8 ? <Text color="cyan">›</Text> : ' '} Container:{' '}
-        <Text color={focus === 8 ? 'cyan' : undefined}>{containers[ci].label}</Text>{' '}
-        <Text color="gray">(← → choose)</Text>
+        {focus === 8 ? (
+          <Text color="cyan">
+            {(() => {
+              const c = fuzzyBest(container, containerLabels);
+              if (c && c.prefix) {
+                return (
+                  <>
+                    {container}
+                    <Text color="gray">{c.option.slice(container.length)}</Text>
+                  </>
+                );
+              }
+              if (c) {
+                return (
+                  <>
+                    {container}
+                    <Text color="gray">  → {c.option}</Text>
+                  </>
+                );
+              }
+              return (
+                <>
+                  {container.slice(0, cursor)}
+                  <Text inverse>{container[cursor] ?? ' '}</Text>
+                  {container.slice(cursor + 1)}
+                </>
+              );
+            })()}
+          </Text>
+        ) : (
+          <Text>{container || '—'}</Text>
+        )}
+        {focus === 8 ? <Text color="gray">  (Tab autocomplete)</Text> : null}
       </Text>
     </Box>
   );
