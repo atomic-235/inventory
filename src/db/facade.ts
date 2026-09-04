@@ -50,6 +50,24 @@ export class DbFacade {
     );
   }
 
+  listAllItems(): Promise<Item[]> {
+    return this.request<unknown>({ type: 'listAllItems', requestId: crypto.randomUUID() }).then(
+      (data) => ListResult.parse(data),
+    );
+  }
+
+  readBlobItems(data: Uint8Array<ArrayBuffer>): Promise<Item[]> {
+    return this.request<unknown>({ type: 'readBlobItems', requestId: crypto.randomUUID(), data }).then(
+      (rows) => ListResult.parse(rows),
+    );
+  }
+
+  replaceItems(items: Item[]): Promise<void> {
+    return this.request<unknown>({ type: 'replaceItems', requestId: crypto.randomUUID(), items }).then(
+      () => undefined,
+    );
+  }
+
   insertItem(item: ItemFieldsInput): Promise<Item> {
     const full: Item = { ...item, id: crypto.randomUUID() } as Item;
     return this.request<unknown>({ type: 'insert', requestId: crypto.randomUUID(), item: full }).then(

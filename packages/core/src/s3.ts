@@ -1,4 +1,4 @@
-import type { SyncConfig } from '../domain/settings';
+import type { SyncConfig } from './config';
 
 function toHex(buf: ArrayBuffer | Uint8Array): string {
   return Array.from(new Uint8Array(buf), (b) => b.toString(16).padStart(2, '0')).join('');
@@ -30,7 +30,7 @@ function encodeKeyPath(key: string): string {
 
 function assertConfigured(cfg: SyncConfig): void {
   if (!cfg.endpoint || !cfg.bucket || !cfg.path || !cfg.accessKey || !cfg.secretKey) {
-    throw new Error('Sync is not fully configured. Set endpoint, bucket, path, access key and secret key in Settings.');
+    throw new Error('Sync is not fully configured. Set endpoint, bucket, path, access key and secret key.');
   }
 }
 

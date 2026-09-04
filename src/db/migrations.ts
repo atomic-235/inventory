@@ -66,4 +66,9 @@ export const MIGRATIONS: string[] = [
      WHERE location_id IS NOT NULL AND parent_id IS NULL;
    ALTER TABLE items DROP COLUMN location_id;
    DROP TABLE locations;`,
+
+  // v6: per-row merge timestamps (epoch ms) + delete tombstones for sync
+  `ALTER TABLE items ADD COLUMN updated_at INTEGER NOT NULL DEFAULT 0;
+   ALTER TABLE items ADD COLUMN deleted_at INTEGER;
+   UPDATE items SET updated_at = ${Date.now()} WHERE updated_at = 0;`,
 ];

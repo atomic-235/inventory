@@ -14,6 +14,8 @@ function item(partial: Partial<Item>): Item {
     condition: '',
     notes: '',
     parent_id: null,
+    updated_at: 0,
+    deleted_at: null,
     ...partial,
   };
 }

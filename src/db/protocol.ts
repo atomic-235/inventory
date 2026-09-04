@@ -63,6 +63,23 @@ export const SaveSyncSettingsRequest = z.object({
   value: z.string(),
 });
 
+export const ListAllItemsRequest = z.object({
+  type: z.literal('listAllItems'),
+  requestId: z.string(),
+});
+
+export const ReadBlobItemsRequest = z.object({
+  type: z.literal('readBlobItems'),
+  requestId: z.string(),
+  data: z.instanceof(Uint8Array),
+});
+
+export const ReplaceItemsRequest = z.object({
+  type: z.literal('replaceItems'),
+  requestId: z.string(),
+  items: z.array(ItemSchema),
+});
+
 export const LookupAddRequest = z.object({
   type: z.literal('lookupAdd'),
   requestId: z.string(),
@@ -97,6 +114,9 @@ export const RequestSchema = z.discriminatedUnion('type', [
   SaveSettingsRequest,
   GetSyncSettingsRequest,
   SaveSyncSettingsRequest,
+  ListAllItemsRequest,
+  ReadBlobItemsRequest,
+  ReplaceItemsRequest,
   LookupAddRequest,
   LookupRenameRequest,
   LookupRemoveRequest,

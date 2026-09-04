@@ -62,7 +62,8 @@ function lookupRowsToLookups(rows: unknown[][]): Lookup[] {
   return rows.map((row) => ({ id: Number(row[0]), name: String(row[1]) }));
 }
 
-function listSql(): string {
+function itemsSql(includeDeleted: boolean): string {
+  const where = includeDeleted ? '' : 'WHERE items.deleted_at IS NULL';
   return `SELECT
     items.id AS id,
     items.name AS name,
@@ -73,11 +74,14 @@ function listSql(): string {
     items.purchase_price AS purchase_price,
     COALESCE(conditions.name, '') AS condition,
     items.notes AS notes,
-    items.parent_id AS parent_id
+    items.parent_id AS parent_id,
+    items.updated_at AS updated_at,
+    items.deleted_at AS deleted_at
     FROM items
     LEFT JOIN categories ON items.category_id = categories.id
     LEFT JOIN units ON items.unit_id = units.id
     LEFT JOIN conditions ON items.condition_id = conditions.id
+    ${where}
     ORDER BY items.name`;
 }
 
@@ -94,12 +98,77 @@ async function handle(request: Request): Promise<void> {
 
     switch (request.type) {
       case 'list': {
-        const { rows, columns } = await sqlite3.execWithParams(db, listSql());
+        const { rows, columns } = await sqlite3.execWithParams(db, itemsSql(false));
         ctx.postMessage({
           type: 'ok',
           requestId: request.requestId,
           data: rowsToItems(rows, columns),
         });
+        break;
+      }
+
+      case 'listAllItems': {
+        const { rows, columns } = await sqlite3.execWithParams(db, itemsSql(true));
+        ctx.postMessage({
+          type: 'ok',
+          requestId: request.requestId,
+          data: rowsToItems(rows, columns),
+        });
+        break;
+      }
+
+      case 'readBlobItems': {
+        const root = await navigator.storage.getDirectory();
+        const tmpName = 'read-items-tmp.sqlite';
+        const tmpHandle = await root.getFileHandle(tmpName, { create: true });
+        const tmpWritable = await tmpHandle.createWritable();
+        await tmpWritable.write(request.data);
+        await tmpWritable.close();
+
+        let tmpDb: number | undefined;
+        let rows: unknown[][] = [];
+        let columns: string[] = [];
+        try {
+          tmpDb = await sqlite3.open_v2(tmpName, undefined, 'opfs');
+          const result = await sqlite3.execWithParams(tmpDb, itemsSql(true));
+          rows = result.rows;
+          columns = result.columns;
+        } finally {
+          if (tmpDb !== undefined) await sqlite3.close(tmpDb);
+          try {
+            await root.removeEntry(tmpName);
+            await root.removeEntry(`${tmpName}-journal`);
+          } catch {
+            /* ignore */
+          }
+        }
+        ctx.postMessage({
+          type: 'ok',
+          requestId: request.requestId,
+          data: rowsToItems(rows, columns),
+        });
+        break;
+      }
+
+      case 'replaceItems': {
+        await sqlite3.run(db, 'DELETE FROM items');
+        for (const item of request.items) {
+          const categoryId = await resolveLookup('categories', item.category);
+          const unitId = await resolveLookup('units', item.unit);
+          const conditionId = await resolveLookup('conditions', item.condition);
+          await sqlite3.run(
+            db,
+            `INSERT INTO items
+              (id, name, category_id, quantity, unit_id, purchase_date, purchase_price, condition_id, notes, parent_id, updated_at, deleted_at)
+              VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`,
+            [
+              item.id, item.name, categoryId, item.quantity, unitId,
+              item.purchase_date, item.purchase_price, conditionId, item.notes, item.parent_id,
+              item.updated_at, item.deleted_at,
+            ],
+          );
+        }
+        ctx.postMessage({ type: 'ok', requestId: request.requestId });
         break;
       }
 
@@ -111,11 +180,11 @@ async function handle(request: Request): Promise<void> {
         await sqlite3.run(
           db,
           `INSERT INTO items
-            (id, name, category_id, quantity, unit_id, purchase_date, purchase_price, condition_id, notes, parent_id)
-            VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`,
+            (id, name, category_id, quantity, unit_id, purchase_date, purchase_price, condition_id, notes, parent_id, updated_at)
+            VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`,
           [
             item.id, item.name, categoryId, item.quantity, unitId,
-            item.purchase_date, item.purchase_price, conditionId, item.notes, item.parent_id,
+            item.purchase_date, item.purchase_price, conditionId, item.notes, item.parent_id, Date.now(),
           ],
         );
         ctx.postMessage({ type: 'ok', requestId: request.requestId });
@@ -146,11 +215,13 @@ async function handle(request: Request): Promise<void> {
           db,
           `UPDATE items SET
             name = ?, category_id = ?, quantity = ?, unit_id = ?,
-            purchase_date = ?, purchase_price = ?, condition_id = ?, notes = ?, parent_id = ?
+            purchase_date = ?, purchase_price = ?, condition_id = ?, notes = ?, parent_id = ?,
+            updated_at = ?, deleted_at = NULL
             WHERE id = ?`,
           [
             item.name, categoryId, item.quantity, unitId,
-            item.purchase_date, item.purchase_price, conditionId, item.notes, item.parent_id, item.id,
+            item.purchase_date, item.purchase_price, conditionId, item.notes, item.parent_id,
+            Date.now(), item.id,
           ],
         );
         ctx.postMessage({ type: 'ok', requestId: request.requestId });
@@ -158,7 +229,11 @@ async function handle(request: Request): Promise<void> {
       }
 
       case 'remove': {
-        await sqlite3.run(db, 'DELETE FROM items WHERE id = ?', [request.id]);
+        await sqlite3.run(db, `UPDATE items SET deleted_at = ?, updated_at = ? WHERE id = ?`, [
+          Date.now(),
+          Date.now(),
+          request.id,
+        ]);
         ctx.postMessage({ type: 'ok', requestId: request.requestId });
         break;
       }

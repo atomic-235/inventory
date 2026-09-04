@@ -6,9 +6,9 @@ test('provider config persists across reload', async ({ page }) => {
   await page.getByLabel('Base URL').fill('https://api.example.com/v1');
   await page.getByLabel('API key').fill('secret');
   await page.getByLabel('Model').fill('qwen3-6-35b-a3b');
-  await page.getByRole('button', { name: 'Save' }).click();
+  await page.locator('form').filter({ hasText: 'Base URL' }).getByRole('button', { name: 'Save' }).click();
 
-  await expect(page.getByRole('status')).toHaveText('Saved');
+  await expect(page.getByRole('status').first()).toHaveText('Saved');
 
   await page.reload();
   await expect(page.getByLabel('Base URL')).toHaveValue('https://api.example.com/v1');
@@ -21,8 +21,8 @@ test('settings are carried in the SQLite backup and restored on import', async (
   await page.getByLabel('Base URL').fill('https://api.example.com/v1');
   await page.getByLabel('API key').fill('top-secret-key');
   await page.getByLabel('Model').fill('qwen3-6-35b-a3b');
-  await page.getByRole('button', { name: 'Save' }).click();
-  await expect(page.getByRole('status')).toHaveText('Saved');
+  await page.locator('form').filter({ hasText: 'Base URL' }).getByRole('button', { name: 'Save' }).click();
+  await expect(page.getByRole('status').first()).toHaveText('Saved');
 
   // export the database (no items needed — a settings-only backup is valid)
   await page.goto('/');

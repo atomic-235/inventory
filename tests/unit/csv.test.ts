@@ -13,6 +13,8 @@ const item: Item = {
   purchase_price: 99.99,
   condition: 'good',
   notes: '',
+  updated_at: 0,
+  deleted_at: null,
 };
 
 describe('itemsToCsv', () => {

@@ -35,6 +35,8 @@ describe('ItemsStore', () => {
     purchase_price: null,
     condition: '',
     notes: '',
+    updated_at: 0,
+    deleted_at: null,
   };
 
   function makeDb(items: Item[] = [item]): ItemsDb {

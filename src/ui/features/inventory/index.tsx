@@ -11,7 +11,7 @@ import { buildAutocomplete, findLastBy } from '../../../domain/autocomplete';
 import type { Autocomplete } from '../../../domain/autocomplete';
 import { ItemTreeView } from './tree';
 import { itemPath } from '../../../domain/tree';
-import { uploadToCloud, restoreFromCloud } from '../../../data/sync';
+import { syncCloud, restoreFromCloud } from '../../../data/sync';
 import { ItemFieldsSchema } from '../../../domain/item';
 import type { Item, ItemFields } from '../../../domain/item';
 import { ZodError } from 'zod';
@@ -419,16 +419,16 @@ export default function InventoryView() {
     setEditingId(null);
   }
 
-  async function onUploadToCloud() {
+  async function onSync() {
     setSyncError(null);
     try {
       const cfg = loadSyncConfig();
-      const passphrase = window.prompt('Set a passphrase for this backup:');
+      const passphrase = window.prompt('Enter passphrase:');
       if (passphrase == null) return;
-      const confirm = window.prompt('Confirm passphrase:');
-      if (confirm !== passphrase) throw new Error('Passphrases do not match');
-      await uploadToCloud(cfg, passphrase);
-      setNotice('Uploaded to cloud');
+      await syncCloud(cfg, passphrase);
+      await items.refresh();
+      await meta.refresh();
+      setNotice('Synced with cloud');
       window.setTimeout(() => setNotice(null), 2000);
     } catch (err) {
       setSyncError(err instanceof Error ? err.message : String(err));
@@ -495,8 +495,8 @@ export default function InventoryView() {
           onChange={onImportFile}
         />
 
-        <button onClick={onUploadToCloud}>
-          Upload to cloud
+        <button onClick={onSync}>
+          Sync with cloud
         </button>
 
         <button onClick={onRestoreFromCloud}>
