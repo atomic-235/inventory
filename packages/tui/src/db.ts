@@ -80,13 +80,23 @@ const MIGRATIONS: string[] = [
    ALTER TABLE items ADD COLUMN deleted_at INTEGER;
    UPDATE items SET updated_at = ${Date.now()} WHERE updated_at = 0;`,
   `ALTER TABLE items ADD COLUMN code TEXT NOT NULL DEFAULT '';`,
-  `UPDATE items SET code = (
-     SELECT printf('%04d', rn) FROM (
-       SELECT id, row_number() OVER (ORDER BY name COLLATE NOCASE, id) AS rn
-       FROM items WHERE code = ''
-     ) WHERE id = items.id
-   ) WHERE code = '';`,
 ];
+
+const CODE_BACKFILL_SQL = `UPDATE items SET code = (
+  SELECT printf('%04d', rn) FROM (
+    SELECT id, row_number() OVER (ORDER BY name COLLATE NOCASE, id) AS rn
+    FROM items WHERE code = ''
+  ) WHERE id = items.id
+) WHERE code = '';`;
+
+function applyMigrations(database: DatabaseSync): void {
+  const row = database.prepare('PRAGMA user_version').get() as { user_version: number };
+  const version = Number(row.user_version ?? 0);
+  for (let i = version; i < MIGRATIONS.length; i++) {
+    database.exec(MIGRATIONS[i]);
+    database.exec(`PRAGMA user_version = ${i + 1}`);
+  }
+}
 
 const LOOKUP_COLUMN: Record<string, string> = {
   categories: 'category_id',
@@ -127,12 +137,14 @@ export class Db {
   }
 
   private migrate(): void {
-    const row = this.db.prepare('PRAGMA user_version').get() as { user_version: number };
-    const version = Number(row.user_version ?? 0);
-    for (let i = version; i < MIGRATIONS.length; i++) {
-      this.db.exec(MIGRATIONS[i]);
-      this.db.exec(`PRAGMA user_version = ${i + 1}`);
-    }
+    applyMigrations(this.db);
+    this.backfillCodes();
+  }
+
+  private backfillCodes(): void {
+    if (this.getSetting('code_backfilled')) return;
+    this.db.exec(CODE_BACKFILL_SQL);
+    this.setSetting('code_backfilled', '1');
   }
 
   private resolveLookup(table: string, name: string): number | null {
@@ -147,6 +159,22 @@ export class Db {
       .prepare('SELECT MAX(CAST(code AS INTEGER)) AS m FROM items')
       .get() as { m: number | null };
     return String((row?.m ?? 0) + 1).padStart(4, '0');
+  }
+
+  getSetting(key: string): string | null {
+    const row = this.db.prepare('SELECT value FROM app_settings WHERE key = ?').get(key) as
+      | { value: string }
+      | undefined;
+    return row?.value ?? null;
+  }
+
+  setSetting(key: string, value: string): void {
+    this.db
+      .prepare(
+        `INSERT INTO app_settings(key, value) VALUES (?, ?)
+         ON CONFLICT(key) DO UPDATE SET value = excluded.value`,
+      )
+      .run(key, value);
   }
 
   listItems(): Item[] {
@@ -297,6 +325,7 @@ export class Db {
     let rows: Record<string, unknown>[] = [];
     try {
       const remote = new DatabaseSync(tmp);
+      applyMigrations(remote);
       rows = remote.prepare(itemsSql(true)).all() as Record<string, unknown>[];
       remote.close();
     } finally {

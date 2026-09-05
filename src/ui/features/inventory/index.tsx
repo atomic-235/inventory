@@ -394,6 +394,8 @@ export default function InventoryView() {
       await meta.refresh();
       const imported = await db.getSettings();
       if (imported) saveConfig(imported);
+      const importedSync = await db.getSyncSettings();
+      if (importedSync) saveSyncConfig(importedSync);
       setNotice('Imported');
       window.setTimeout(() => setNotice(null), 2000);
     } catch (err) {

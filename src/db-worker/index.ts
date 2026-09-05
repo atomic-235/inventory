@@ -24,13 +24,35 @@ const ITEM_COLUMN: Record<LookupTable, string> = {
 let sqlite3: SQLiteAPI;
 let db: number;
 
-async function migrate(): Promise<void> {
-  const { rows } = await sqlite3.execWithParams(db, 'PRAGMA user_version');
+async function migrate(target: number): Promise<void> {
+  const { rows } = await sqlite3.execWithParams(target, 'PRAGMA user_version');
   const version = Number(rows[0]?.[0] ?? 0);
   for (let i = version; i < MIGRATIONS.length; i++) {
-    await sqlite3.run(db, MIGRATIONS[i]);
-    await sqlite3.run(db, `PRAGMA user_version = ${i + 1}`);
+    await sqlite3.run(target, MIGRATIONS[i]);
+    await sqlite3.run(target, `PRAGMA user_version = ${i + 1}`);
   }
+}
+
+const CODE_BACKFILL_SQL = `UPDATE items SET code = (
+  SELECT printf('%04d', rn) FROM (
+    SELECT id, row_number() OVER (ORDER BY name COLLATE NOCASE, id) AS rn
+    FROM items WHERE code = ''
+  ) WHERE id = items.id
+) WHERE code = '';`;
+
+async function getSetting(target: number, key: string): Promise<string | null> {
+  const { rows } = await sqlite3.execWithParams(target, `SELECT value FROM app_settings WHERE key = ?`, [key]);
+  return rows[0]?.[0] != null ? String(rows[0][0]) : null;
+}
+
+async function backfillCodes(target: number): Promise<void> {
+  if (await getSetting(target, 'code_backfilled')) return;
+  await sqlite3.run(target, CODE_BACKFILL_SQL);
+  await sqlite3.run(
+    target,
+    `INSERT INTO app_settings(key, value) VALUES ('code_backfilled', '1')
+     ON CONFLICT(key) DO UPDATE SET value = excluded.value`,
+  );
 }
 
 const ready = (async () => {
@@ -38,7 +60,8 @@ const ready = (async () => {
   sqlite3 = Factory(module);
   sqlite3.vfs_register(new OriginPrivateFileSystemVFS(), true);
   db = await sqlite3.open_v2('inventory', undefined, 'opfs');
-  await migrate();
+  await migrate(db);
+  await backfillCodes(db);
 })();
 
 function rowsToItems(rows: unknown[][], columns: string[]): Item[] {
@@ -140,6 +163,7 @@ async function handle(request: Request): Promise<void> {
         let columns: string[] = [];
         try {
           tmpDb = await sqlite3.open_v2(tmpName, undefined, 'opfs');
+          await migrate(tmpDb);
           const result = await sqlite3.execWithParams(tmpDb, itemsSql(true));
           rows = result.rows;
           columns = result.columns;
@@ -308,7 +332,8 @@ async function handle(request: Request): Promise<void> {
         await mainWritable.close();
 
         db = await sqlite3.open_v2('inventory', undefined, 'opfs');
-        await migrate();
+        await migrate(db);
+        await backfillCodes(db);
         ctx.postMessage({ type: 'ok', requestId: request.requestId });
         break;
       }

@@ -531,6 +531,12 @@ function App({ db }: { db: Db }) {
       })();
       return;
     }
+    if (input === 'c') {
+      db.setSetting('sync', JSON.stringify(loadConfig()));
+      const cfg = loadConfig();
+      setStatus(`config saved to db (bucket=${cfg.bucket || '—'})`);
+      return;
+    }
     if (input === 'R') {
       refresh();
       if (view === 'manage') setLookups(db.listLookups(table));
@@ -659,7 +665,7 @@ function App({ db }: { db: Db }) {
           </Text>
         ))
       )}
-      <Text color="gray">↑/↓ nav · Enter edit · a add · d delete · t tree · / search · m manage · s sync · r restore · R refresh · q quit</Text>
+      <Text color="gray">↑/↓ nav · Enter edit · a add · d delete · t tree · / search · m manage · s sync · r restore · c save config · R refresh · q quit</Text>
       {status ? <Text color="gray">{status}</Text> : null}
     </Box>
   );

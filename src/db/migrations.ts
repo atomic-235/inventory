@@ -74,12 +74,4 @@ export const MIGRATIONS: string[] = [
 
   // v7: short human label code (auto-generated, stable alias)
   `ALTER TABLE items ADD COLUMN code TEXT NOT NULL DEFAULT '';`,
-
-  // v8: backfill codes for existing rows
-  `UPDATE items SET code = (
-     SELECT printf('%04d', rn) FROM (
-       SELECT id, row_number() OVER (ORDER BY name COLLATE NOCASE, id) AS rn
-       FROM items WHERE code = ''
-     ) WHERE id = items.id
-   ) WHERE code = '';`,
 ];
