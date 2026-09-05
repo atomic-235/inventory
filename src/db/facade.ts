@@ -62,6 +62,18 @@ export class DbFacade {
     );
   }
 
+  readBlobSettings(data: Uint8Array<ArrayBuffer>): Promise<Record<string, string>> {
+    return this.request<unknown>({ type: 'readBlobSettings', requestId: crypto.randomUUID(), data }).then(
+      (settings) => settings as Record<string, string>,
+    );
+  }
+
+  mergeSettings(settings: Record<string, string>): Promise<void> {
+    return this.request<unknown>({ type: 'mergeSettings', requestId: crypto.randomUUID(), settings }).then(
+      () => undefined,
+    );
+  }
+
   replaceItems(items: Item[]): Promise<void> {
     return this.request<unknown>({ type: 'replaceItems', requestId: crypto.randomUUID(), items }).then(
       () => undefined,

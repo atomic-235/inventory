@@ -21,12 +21,17 @@ function backupDb(db: Db): string {
 
 export async function syncCloud(db: Db, cfg: SyncConfig, passphrase: string): Promise<void> {
   const remoteBlob = await getObjectOptional(cfg);
-  const remoteItems = remoteBlob
-    ? db.readItemsFromBlob(await decryptBytes(passphrase, remoteBlob))
-    : [];
+  let remoteItems: ReturnType<Db['readItemsFromBlob']> = [];
+  let remoteSettings: Record<string, string> = {};
+  if (remoteBlob) {
+    const decrypted = await decryptBytes(passphrase, remoteBlob);
+    remoteItems = db.readItemsFromBlob(decrypted);
+    remoteSettings = db.readSettingsFromBlob(decrypted);
+  }
   const localItems = db.listAllItems();
   backupDb(db);
   db.replaceItems(mergeItems(localItems, remoteItems));
+  db.mergeSettings(remoteSettings);
   await putObject(cfg, await encryptBytes(passphrase, db.exportBlob()));
 }
 

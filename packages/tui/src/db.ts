@@ -334,6 +334,32 @@ export class Db {
     return rows.map((r) => ItemSchema.parse(r));
   }
 
+  readSettingsFromBlob(bytes: Uint8Array<ArrayBuffer>): Record<string, string> {
+    const tmp = join(tmpdir(), `inventory-read-settings-${randomBytes(6).toString('hex')}.sqlite`);
+    writeFileSync(tmp, bytes);
+    const out: Record<string, string> = {};
+    try {
+      const remote = new DatabaseSync(tmp);
+      applyMigrations(remote);
+      const rows = remote.prepare('SELECT key, value FROM app_settings').all() as {
+        key: string;
+        value: string;
+      }[];
+      for (const r of rows) out[r.key] = r.value;
+      remote.close();
+    } finally {
+      rmSync(tmp, { force: true });
+    }
+    return out;
+  }
+
+  mergeSettings(remote: Record<string, string>): void {
+    for (const [key, value] of Object.entries(remote)) {
+      const current = this.getSetting(key);
+      if (current == null || current === '') this.setSetting(key, value);
+    }
+  }
+
   close(): void {
     this.db.close();
   }

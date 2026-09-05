@@ -184,6 +184,54 @@ async function handle(request: Request): Promise<void> {
         break;
       }
 
+      case 'readBlobSettings': {
+        const root = await navigator.storage.getDirectory();
+        const tmpName = 'read-settings-tmp.sqlite';
+        const tmpHandle = await root.getFileHandle(tmpName, { create: true });
+        const tmpWritable = await tmpHandle.createWritable();
+        await tmpWritable.write(request.data);
+        await tmpWritable.close();
+
+        let tmpDb: number | undefined;
+        const settings: Record<string, string> = {};
+        try {
+          tmpDb = await sqlite3.open_v2(tmpName, undefined, 'opfs');
+          await migrate(tmpDb);
+          const { rows } = await sqlite3.execWithParams(tmpDb, 'SELECT key, value FROM app_settings');
+          for (const row of rows) settings[String(row[0])] = String(row[1]);
+        } finally {
+          if (tmpDb !== undefined) await sqlite3.close(tmpDb);
+          try {
+            await root.removeEntry(tmpName);
+            await root.removeEntry(`${tmpName}-journal`);
+          } catch {
+            /* ignore */
+          }
+        }
+        ctx.postMessage({ type: 'ok', requestId: request.requestId, data: settings });
+        break;
+      }
+
+      case 'mergeSettings': {
+        for (const [key, value] of Object.entries(request.settings)) {
+          const { rows } = await sqlite3.execWithParams(
+            db,
+            `SELECT value FROM app_settings WHERE key = ?`,
+            [key],
+          );
+          if (!rows.length || rows[0][0] == null || String(rows[0][0]) === '') {
+            await sqlite3.run(
+              db,
+              `INSERT INTO app_settings(key, value) VALUES (?, ?)
+               ON CONFLICT(key) DO UPDATE SET value = excluded.value`,
+              [key, value],
+            );
+          }
+        }
+        ctx.postMessage({ type: 'ok', requestId: request.requestId });
+        break;
+      }
+
       case 'replaceItems': {
         await sqlite3.run(db, 'DELETE FROM items');
         for (const item of request.items) {
