@@ -329,7 +329,7 @@ export default function InventoryView() {
     }
   }
 
-  function onSubmit(e: Event) {
+  async function onSubmit(e: Event) {
     e.preventDefault();
     setFormError(null);
     let fields: ItemFields;
@@ -341,14 +341,15 @@ export default function InventoryView() {
     }
     if (editingId) {
       const existing = list.find((i) => i.id === editingId);
-      if (existing) items.update({ ...existing, ...fields });
+      if (existing) await items.update({ ...existing, ...fields });
+      setNotice('Updated');
     } else {
-      items.add(fields);
+      const created = await items.add(fields);
+      setNotice(created.code ? `Saved — code ${created.code}` : 'Saved');
     }
     setForm(toFormState({}));
     setEditingId(null);
-    setNotice(editingId ? 'Updated' : 'Saved');
-    window.setTimeout(() => setNotice(null), 2000);
+    window.setTimeout(() => setNotice(null), 4000);
   }
 
   function onEdit(item: Item) {

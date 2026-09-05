@@ -271,7 +271,7 @@ async function handle(request: Request): Promise<void> {
             item.purchase_date, item.purchase_price, conditionId, item.notes, item.parent_id, Date.now(),
           ],
         );
-        ctx.postMessage({ type: 'ok', requestId: request.requestId });
+        ctx.postMessage({ type: 'ok', requestId: request.requestId, data: code });
         break;
       }
 

@@ -70,7 +70,22 @@ describe('complete', () => {
 describe('structuredJson', () => {
   const schema = z.object({ name: z.string() });
 
-  it('sends json_schema response_format and zod-parses content', async () => {
+  it('sends json_schema response_format and zod-parses content when supportsResponseFormat', async () => {
+    const fetchMock = mockFetch({
+      choices: [{ message: { role: 'assistant', content: '{"name":"Lamp"}' } }],
+    });
+
+    const result = await structuredJson(schema, { ...params, supportsResponseFormat: true });
+
+    expect(result).toEqual({ name: 'Lamp' });
+
+    const [, init] = fetchMock.call();
+    const body = JSON.parse(init.body);
+    expect(body.response_format.type).toBe('json_schema');
+    expect(body.response_format.json_schema.schema).toBeTruthy();
+  });
+
+  it('omits response_format and zod-parses content by default (prompt-based JSON)', async () => {
     const fetchMock = mockFetch({
       choices: [{ message: { role: 'assistant', content: '{"name":"Lamp"}' } }],
     });
@@ -81,8 +96,8 @@ describe('structuredJson', () => {
 
     const [, init] = fetchMock.call();
     const body = JSON.parse(init.body);
-    expect(body.response_format.type).toBe('json_schema');
-    expect(body.response_format.json_schema.schema).toBeTruthy();
+    expect(body.response_format).toBeUndefined();
+    expect(body.messages[body.messages.length - 1].content).toContain('JSON object');
   });
 
   it('throws when content does not match the schema', async () => {

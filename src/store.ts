@@ -59,9 +59,10 @@ export class ItemsStore extends Store<ItemsState> {
     }
   }
 
-  async add(fields: ItemFieldsInput): Promise<void> {
-    await this.db.insertItem(fields);
+  async add(fields: ItemFieldsInput): Promise<Item> {
+    const item = await this.db.insertItem(fields);
     await this.refresh();
+    return item;
   }
 
   async update(item: Item): Promise<void> {

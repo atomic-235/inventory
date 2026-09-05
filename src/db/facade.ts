@@ -83,7 +83,7 @@ export class DbFacade {
   insertItem(item: ItemFieldsInput): Promise<Item> {
     const full: Item = { ...item, id: crypto.randomUUID() } as Item;
     return this.request<unknown>({ type: 'insert', requestId: crypto.randomUUID(), item: full }).then(
-      () => full,
+      (code) => ({ ...full, code: code == null ? '' : String(code) }),
     );
   }
 
