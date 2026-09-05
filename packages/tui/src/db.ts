@@ -104,10 +104,7 @@ const LOOKUP_COLUMN: Record<string, string> = {
   conditions: 'condition_id',
 };
 
-function itemsSql(includeDeleted: boolean): string {
-  const where = includeDeleted ? '' : 'WHERE items.deleted_at IS NULL';
-  return `SELECT
-    items.id AS id,
+const ITEM_COLUMNS = `items.id AS id,
     items.name AS name,
     items.code AS code,
     COALESCE(categories.name, '') AS category,
@@ -119,13 +116,16 @@ function itemsSql(includeDeleted: boolean): string {
     items.notes AS notes,
     items.parent_id AS parent_id,
     items.updated_at AS updated_at,
-    items.deleted_at AS deleted_at
-    FROM items
+    items.deleted_at AS deleted_at`;
+
+const ITEM_FROM = `FROM items
     LEFT JOIN categories ON items.category_id = categories.id
     LEFT JOIN units ON items.unit_id = units.id
-    LEFT JOIN conditions ON items.condition_id = conditions.id
-    ${where}
-    ORDER BY items.name`;
+    LEFT JOIN conditions ON items.condition_id = conditions.id`;
+
+function itemsSql(includeDeleted: boolean): string {
+  const where = includeDeleted ? '' : 'WHERE items.deleted_at IS NULL';
+  return `SELECT ${ITEM_COLUMNS} ${ITEM_FROM} ${where} ORDER BY items.name`;
 }
 
 export class Db {
@@ -161,6 +161,18 @@ export class Db {
     return String((row?.m ?? 0) + 1).padStart(4, '0');
   }
 
+  private parentCategory(parentId?: string | null): string {
+    if (!parentId) return '';
+    const row = this.db
+      .prepare(
+        `SELECT COALESCE(categories.name, '') AS category FROM items
+         LEFT JOIN categories ON items.category_id = categories.id
+         WHERE items.id = ?`,
+      )
+      .get(parentId) as { category: string } | undefined;
+    return row?.category ?? '';
+  }
+
   getSetting(key: string): string | null {
     const row = this.db.prepare('SELECT value FROM app_settings WHERE key = ?').get(key) as
       | { value: string }
@@ -185,6 +197,21 @@ export class Db {
 
   listAllItems(): Item[] {
     return (this.db.prepare(itemsSql(true)).all() as Record<string, unknown>[]).map((r) =>
+      ItemSchema.parse(r),
+    );
+  }
+
+  searchItems(query: string): Item[] {
+    const q = query.trim();
+    if (!q) return this.listItems();
+    const like = `%${q.replace(/[\\%_]/g, (m) => `\\${m}`)}%`;
+    const sql = `SELECT ${ITEM_COLUMNS} ${ITEM_FROM}
+      WHERE items.deleted_at IS NULL
+        AND (items.name LIKE ? ESCAPE '\\'
+             OR COALESCE(categories.name, '') LIKE ? ESCAPE '\\'
+             OR items.notes LIKE ? ESCAPE '\\')
+      ORDER BY items.name`;
+    return (this.db.prepare(sql).all(like, like, like) as Record<string, unknown>[]).map((r) =>
       ItemSchema.parse(r),
     );
   }
@@ -225,10 +252,11 @@ export class Db {
     }
   }
 
-  insertItem(f: NewItem): void {
+  insertItem(f: NewItem): string {
     const id: string = randomUUID();
     const code = this.nextCode();
     const now = Date.now();
+    const category = (f.category ?? '').trim() || this.parentCategory(f.parent_id);
     this.db
       .prepare(
         `INSERT INTO items
@@ -239,7 +267,7 @@ export class Db {
         id,
         f.name,
         code,
-        this.resolveLookup('categories', f.category ?? ''),
+        this.resolveLookup('categories', category),
         f.quantity ?? 1,
         this.resolveLookup('units', f.unit ?? ''),
         f.purchase_date ?? '',
@@ -250,6 +278,7 @@ export class Db {
         now,
         null,
       );
+    return code;
   }
 
   removeItem(id: string): void {

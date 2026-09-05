@@ -1,5 +1,5 @@
-import React, { useState } from 'react';
-import { render, Box, Text, useApp, useInput } from 'ink';
+import React, { useEffect, useState } from 'react';
+import { render, Box, Text, useApp, useInput, useStdout } from 'ink';
 import {
   type Item,
   buildTree,
@@ -124,30 +124,30 @@ function ItemForm(props: {
   onCancel: () => void;
 }) {
   const init = props.initial;
-  const [values, setValues] = useState<string[]>([
-    init.name ?? '',
-    init.category ?? '',
-    String(init.quantity ?? 1),
-    init.unit ?? '',
-    init.purchase_date ?? '',
-    init.purchase_price != null ? String(init.purchase_price) : '',
-    init.condition ?? '',
-    init.notes ?? '',
-  ]);
+  const [values, setValues] = useState<string[]>(() => {
+    const parent = init.parent_id ? props.items.find((i) => i.id === init.parent_id) : undefined;
+    return [
+      init.name ?? '',
+      init.category ?? parent?.category ?? '',
+      String(init.quantity ?? 1),
+      init.unit ?? '',
+      init.purchase_date ?? '',
+      init.purchase_price != null ? String(init.purchase_price) : '',
+      init.condition ?? '',
+      init.notes ?? '',
+    ];
+  });
   const [focus, setFocus] = useState(0);
   const [cursor, setCursor] = useState(0);
   const [creating, setCreating] = useState<null | { field: number; prev: string }>(null);
 
-  const containers = [
-    { id: '', label: '(none)' },
-    ...props.items
-      .filter((i) => i.id !== init.id)
-      .map((i) => ({ id: i.id, label: itemPath(i.id, props.items) })),
-  ];
+  const containers = props.items
+    .filter((i) => i.id !== init.id)
+    .map((i) => ({ id: i.id, label: itemPath(i.id, props.items) }));
   const containerLabels = containers.map((c) => c.label);
   const [container, setContainer] = useState(() => {
-    const idx = containers.findIndex((c) => c.id === (init.parent_id ?? ''));
-    return containers[idx >= 0 ? idx : 0].label;
+    const c = containers.find((c) => c.id === init.parent_id);
+    return c ? c.label : '';
   });
 
   const moveFocus = (f: number) => {
@@ -218,8 +218,7 @@ function ItemForm(props: {
       return;
     }
     if (key.return) {
-      if (focus === 8) submit();
-      else moveFocus(focus + 1);
+      submit();
       return;
     }
     if (focus === 8) {
@@ -336,7 +335,7 @@ function ItemForm(props: {
     <Box flexDirection="column">
       <Text bold>
         {props.submitLabel} item{' '}
-        <Text color="gray">(Enter=next/save · Esc=cancel · ↑/↓ move · Tab=autocomplete · + new)</Text>
+        <Text color="gray">(Enter=save · Esc=cancel · ↑/↓ field · Tab=autocomplete · + new)</Text>
       </Text>
       {FIELD_LABELS.map((label, i) => {
         const isF = focus === i;
@@ -391,13 +390,13 @@ function ItemForm(props: {
   );
 }
 
-function flatten(items: Item[]): { item: Item; depth: number }[] {
+function flatten(items: Item[], collapsed: Set<string> = new Set()): { item: Item; depth: number }[] {
   const tree = buildTree(items);
   const out: { item: Item; depth: number }[] = [];
   const walk = (roots: Item[], depth: number) => {
     for (const r of roots) {
       out.push({ item: r, depth });
-      walk(tree.childrenOf(r.id), depth + 1);
+      if (!collapsed.has(r.id)) walk(tree.childrenOf(r.id), depth + 1);
     }
   };
   walk(tree.roots, 0);
@@ -406,20 +405,34 @@ function flatten(items: Item[]): { item: Item; depth: number }[] {
 
 function App({ db }: { db: Db }) {
   const { exit } = useApp();
+  const { stdout } = useStdout();
   const [items, setItems] = useState<Item[]>(db.listItems());
-  const [view, setView] = useState<'list' | 'tree' | 'manage'>('list');
+  const [view, setView] = useState<'list' | 'tree' | 'manage'>('tree');
   const [select, setSelect] = useState(0);
   const [query, setQuery] = useState('');
   const [searching, setSearching] = useState(false);
-  const [form, setForm] = useState<null | { kind: 'add' } | { kind: 'edit'; item: Item }>(null);
+  const [form, setForm] = useState<null | { kind: 'add'; parentId?: string | null } | { kind: 'edit'; item: Item }>(null);
   const [table, setTable] = useState<LookupTable>('categories');
   const [lookups, setLookups] = useState(db.listLookups('categories'));
   const [lkSel, setLkSel] = useState(0);
   const [prompt, setPrompt] = useState<null | { label: string; initial: string; onSubmit: (v: string) => void }>(null);
   const [status, setStatus] = useState('');
+  const [scroll, setScroll] = useState(0);
+  const [collapsed, setCollapsed] = useState<Set<string>>(() => {
+    const all = db.listItems();
+    const homes = new Set(all.filter((i) => !i.parent_id).map((i) => i.id));
+    return new Set(all.filter((i) => i.parent_id && homes.has(i.parent_id)).map((i) => i.id));
+  });
 
   const refresh = () => setItems(db.listItems());
-  const filtered = query ? items.filter((i) => i.name.toLowerCase().includes(query.toLowerCase())) : items;
+  const filtered = query ? db.searchItems(query) : items;
+  const entries = view === 'tree' ? flatten(filtered, collapsed) : filtered.map((i) => ({ item: i, depth: 0 }));
+  const sel = Math.min(select, Math.max(0, entries.length - 1));
+  const chrome = 3 + (searching ? 1 : 0) + (status ? 1 : 0);
+  const viewHeight = Math.max(3, (stdout.rows ?? 40) - chrome);
+  useEffect(() => {
+    setScroll((s) => (sel < s ? sel : sel >= s + viewHeight ? sel - viewHeight + 1 : s));
+  }, [sel, viewHeight]);
 
   useInput((input, key) => {
     if (prompt) return;
@@ -430,8 +443,13 @@ function App({ db }: { db: Db }) {
         setSearching(false);
         setQuery('');
       } else if (key.return) {
+        const matches = db.searchItems(query);
         setSearching(false);
-      } else if (key.backspace) {
+        if (view !== 'manage' && matches.length === 1) {
+          setSelect(0);
+          setForm({ kind: 'edit', item: matches[0] });
+        }
+      } else if (key.backspace || key.delete) {
         setQuery((q) => q.slice(0, -1));
       } else {
         const ch = cleanInput(input, key);
@@ -447,7 +465,7 @@ function App({ db }: { db: Db }) {
     }
     if (key.return) {
       if (view === 'list' || view === 'tree') {
-        const current = view === 'list' ? filtered[select] : flatten(filtered)[select]?.item;
+        const current = view === 'list' ? filtered[select] : flatten(filtered, collapsed)[select]?.item;
         if (current) setForm({ kind: 'edit', item: current });
       }
       return;
@@ -472,7 +490,8 @@ function App({ db }: { db: Db }) {
           },
         });
       } else {
-        setForm({ kind: 'add' });
+        const current = view === 'list' ? filtered[select] : flatten(filtered, collapsed)[select]?.item;
+        setForm({ kind: 'add', parentId: current?.id ?? null });
       }
       return;
     }
@@ -485,7 +504,7 @@ function App({ db }: { db: Db }) {
           setLkSel((s) => Math.min(s, Math.max(0, lookups.length - 2)));
         }
       } else {
-        const current = view === 'list' ? filtered[select] : flatten(filtered)[select]?.item;
+        const current = view === 'list' ? filtered[select] : flatten(filtered, collapsed)[select]?.item;
         if (current) {
           db.removeItem(current.id);
           refresh();
@@ -548,6 +567,20 @@ function App({ db }: { db: Db }) {
       setSelect(0);
       return;
     }
+    if (input === ' ') {
+      if (view === 'tree') {
+        const current = flatten(filtered, collapsed)[select]?.item;
+        if (current) {
+          setCollapsed((c) => {
+            const n = new Set(c);
+            if (n.has(current.id)) n.delete(current.id);
+            else n.add(current.id);
+            return n;
+          });
+        }
+      }
+      return;
+    }
     if (input === 'm') {
       if (view === 'manage') {
         const idx = (LOOKUP_TABLES.indexOf(table) + 1) % LOOKUP_TABLES.length;
@@ -565,17 +598,35 @@ function App({ db }: { db: Db }) {
     }
 
     if (view === 'manage') {
-      if (key.downArrow) setLkSel((s) => Math.min(s + 1, lookups.length - 1));
-      else if (key.upArrow) setLkSel((s) => Math.max(0, s - 1));
+      if (key.downArrow || input === 'j') setLkSel((s) => Math.min(s + 1, lookups.length - 1));
+      else if (key.upArrow || input === 'k') setLkSel((s) => Math.max(0, s - 1));
     } else {
-      const len = view === 'list' ? filtered.length : flatten(filtered).length;
-      if (key.downArrow) setSelect((s) => Math.min(s + 1, len - 1));
-      else if (key.upArrow) setSelect((s) => Math.max(0, s - 1));
+      const flat = view === 'tree' ? flatten(filtered, collapsed) : filtered.map((item) => ({ item, depth: 0 }));
+      const len = flat.length;
+      if (key.downArrow || input === 'j') setSelect((s) => Math.min(s + 1, len - 1));
+      else if (key.upArrow || input === 'k') setSelect((s) => Math.max(0, s - 1));
+      else if (input === 'l') {
+        const d = flat[select]?.depth ?? 0;
+        for (let i = select + 1; i < len; i++) {
+          if (flat[i].depth === d + 1) {
+            setSelect(i);
+            break;
+          }
+        }
+      } else if (input === 'h' || input === 'p') {
+        const d = flat[select]?.depth ?? 0;
+        for (let i = select - 1; i >= 0; i--) {
+          if (flat[i].depth === d - 1) {
+            setSelect(i);
+            break;
+          }
+        }
+      }
     }
   });
 
   if (form) {
-    const initial = form.kind === 'edit' ? form.item : {};
+    const initial = form.kind === 'edit' ? form.item : { parent_id: form.parentId ?? null };
     return (
       <ItemForm
         initial={initial}
@@ -594,11 +645,19 @@ function App({ db }: { db: Db }) {
           }
           if (form.kind === 'edit') {
             db.updateItem({ ...form.item, ...data });
+            setStatus('updated');
           } else {
-            db.insertItem(data);
+            const code = db.insertItem(data);
+            setStatus(`added — code ${code}`);
           }
           refresh();
           setForm(null);
+          if (form.kind === 'edit') {
+            const list = query ? db.searchItems(query) : db.listItems();
+            const flat = view === 'tree' ? flatten(list, collapsed) : list.map((i) => ({ item: i, depth: 0 }));
+            const idx = flat.findIndex((e) => e.item.id === form.item.id);
+            if (idx >= 0) setSelect(idx);
+          }
         }}
         onCancel={() => setForm(null)}
       />
@@ -644,28 +703,42 @@ function App({ db }: { db: Db }) {
     );
   }
 
-  const entries = view === 'tree' ? flatten(filtered) : filtered.map((i) => ({ item: i, depth: 0 }));
-  const sel = Math.min(select, Math.max(0, entries.length - 1));
+  const parents = new Set<string>();
+  for (const i of filtered) if (i.parent_id) parents.add(i.parent_id);
 
   return (
     <Box flexDirection="column">
       <Text bold underline>
         Inventory <Text color="gray">[{view}]{query ? ` filter: ${query}` : ''}</Text>
       </Text>
+      {searching ? (
+        <Text color="cyan">
+          Search: {query}
+          <Text inverse> </Text>
+          <Text color="gray">  (type to filter · Enter/Esc to exit)</Text>
+        </Text>
+      ) : null}
       {entries.length === 0 ? (
         <Text color="gray">(no items{query ? ' matching' : ''})</Text>
       ) : (
-        entries.map((e, i) => (
-          <Text key={e.item.id} color={i === sel ? 'cyan' : undefined}>
-            {i === sel ? '›' : ' '} {' '.repeat(e.depth * 2)}
-            {e.item.code ? <Text color="gray">[{e.item.code}] </Text> : null}
-            {e.item.name}
-            {e.item.category ? ` — ${e.item.category}` : ''}
-            {e.item.quantity > 1 ? ` ×${e.item.quantity}` : ''}
-          </Text>
-        ))
+        entries.slice(scroll, scroll + viewHeight).map((e, i) => {
+          const isFolder = parents.has(e.item.id);
+          const fold = view === 'tree'
+            ? (isFolder ? (collapsed.has(e.item.id) ? '▸' : '▾') : ' ')
+            : null;
+          return (
+            <Text key={e.item.id} color={scroll + i === sel ? 'cyan' : undefined}>
+              {scroll + i === sel ? '›' : ' '} {' '.repeat(e.depth * 2)}
+              {fold != null ? <Text color="gray">{fold} </Text> : null}
+              {e.item.code ? <Text color="gray">[{e.item.code}] </Text> : null}
+              {e.item.name}
+              {e.item.category ? ` — ${e.item.category}` : ''}
+              {e.item.quantity > 1 ? ` ×${e.item.quantity}` : ''}
+            </Text>
+          );
+        })
       )}
-      <Text color="gray">↑/↓ nav · Enter edit · a add · d delete · t tree · / search · m manage · s sync · r restore · c save config · R refresh · q quit</Text>
+      <Text color="gray">↑/↓ nav · Enter edit · a add · d delete · space fold · t tree · / search · m manage · s sync · r restore · c save config · R refresh · q quit</Text>
       {status ? <Text color="gray">{status}</Text> : null}
     </Box>
   );

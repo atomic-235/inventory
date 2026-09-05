@@ -90,6 +90,18 @@ async function nextCode(): Promise<string> {
   return String((Number.isFinite(m) ? m : 0) + 1).padStart(4, '0');
 }
 
+async function parentCategory(parentId?: string | null): Promise<string> {
+  if (!parentId) return '';
+  const { rows } = await sqlite3.execWithParams(
+    db,
+    `SELECT COALESCE(categories.name, '') FROM items
+     LEFT JOIN categories ON items.category_id = categories.id
+     WHERE items.id = ?`,
+    [parentId],
+  );
+  return rows[0]?.[0] != null ? String(rows[0][0]) : '';
+}
+
 function lookupRowsToLookups(rows: unknown[][]): Lookup[] {
   return rows.map((row) => ({ id: Number(row[0]), name: String(row[1]) }));
 }
@@ -257,7 +269,10 @@ async function handle(request: Request): Promise<void> {
 
       case 'insert': {
         const { item } = request;
-        const categoryId = await resolveLookup('categories', item.category);
+        const category = (item.category ?? '').trim()
+          ? item.category
+          : await parentCategory(item.parent_id);
+        const categoryId = await resolveLookup('categories', category);
         const unitId = await resolveLookup('units', item.unit);
         const conditionId = await resolveLookup('conditions', item.condition);
         const code = await nextCode();
