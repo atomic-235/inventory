@@ -27,6 +27,7 @@ describe('ItemsStore', () => {
   const item: Item = {
     id: '1',
     name: 'Lamp',
+    code: '',
     parent_id: null,
     category: '',
     quantity: 1,

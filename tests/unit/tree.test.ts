@@ -6,6 +6,7 @@ function item(partial: Partial<Item>): Item {
   return {
     id: '1',
     name: 'x',
+    code: '',
     category: '',
     quantity: 1,
     unit: '',

@@ -561,6 +561,7 @@ export default function InventoryView() {
           {filtered.map((item) => (
             <li key={item.id}>
               <span>
+                {item.code ? `[${item.code}] ` : ''}
                 {item.name}
                 {item.category ? ` — ${item.category}` : ''}
                 {item.quantity > 1 ? ` (x${item.quantity})` : ''}

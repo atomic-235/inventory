@@ -165,6 +165,43 @@ Properties are `Property, City, Country` (e.g. `Flat, Kolpino, Russia`). Keep it
 orphan duplicates after a recovery: they look like a root item with empty notes
 and no children (the re-added copy has the notes + children). Remove the orphan.
 
+## Getting the house in order
+
+Operational workflow for cataloguing ~1000 small items without getting lost.
+The bottleneck is **decision fatigue** (keep/place/name judgments), not typing.
+Location-batch to remove the hardest decision ("where does it belong") and leave
+only the easy one ("what is it").
+
+### Starter sequence (one room at a time)
+
+1. Pick the **smallest, highest-density** spot (one closet/corner), not "the house".
+2. **Garbage pass first, no cataloguing**: empty ONE box, bin/donate trash,
+   duplicates, expired, empty packaging, broken items. Zero keep/place decisions.
+   Removes ~20–30% of the volume for free.
+3. **Catalog keepers, one-touch**: pick → name *specifically* → place in home,
+   in a single motion. No "sort later" pile.
+4. **Label**: box label = box code/name only (**no content list** — the DB is the
+   content list). Item label = its stable `code`.
+5. Stop at the **done-state** (box empty, rows recorded). Next session = next box.
+
+### Non-negotiables
+
+- **One box = one session, always to done.** Never leave a box half-processed.
+- **One-touch per item** — decide + record + label + place in one motion.
+- **Ban "misc".** Every item names its nearest real ancestor.
+- **No premature taxonomy.** Classify as you go; freeze once started; rename/merge
+  only in the DB afterward, never re-handle finished items.
+- **Minimal first-pass capture:** `code` + *specific* name + box are the only
+  fields that matter (`DeWalt 20V cordless drill`, not `drill`). Defer
+  category/condition/price/date/notes to a later bulk pass.
+- **Don't buy bins before knowing the volume.** Use existing containers.
+
+### Agent (MCP) role
+
+The agent bulk-adds items via `inventory_add_item` as the user reports keepers
+box-by-box; each auto-receives its `code` (what gets printed). Names must stay
+specific. Categories/condition/price are assigned later in bulk, not mid-sort.
+
 ## Secrets
 
 - API key is entered at runtime into browser localStorage, never committed or

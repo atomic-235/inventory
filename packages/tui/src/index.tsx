@@ -652,6 +652,7 @@ function App({ db }: { db: Db }) {
         entries.map((e, i) => (
           <Text key={e.item.id} color={i === sel ? 'cyan' : undefined}>
             {i === sel ? '›' : ' '} {' '.repeat(e.depth * 2)}
+            {e.item.code ? <Text color="gray">[{e.item.code}] </Text> : null}
             {e.item.name}
             {e.item.category ? ` — ${e.item.category}` : ''}
             {e.item.quantity > 1 ? ` ×${e.item.quantity}` : ''}

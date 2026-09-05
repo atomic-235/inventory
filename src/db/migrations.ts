@@ -71,4 +71,15 @@ export const MIGRATIONS: string[] = [
   `ALTER TABLE items ADD COLUMN updated_at INTEGER NOT NULL DEFAULT 0;
    ALTER TABLE items ADD COLUMN deleted_at INTEGER;
    UPDATE items SET updated_at = ${Date.now()} WHERE updated_at = 0;`,
+
+  // v7: short human label code (auto-generated, stable alias)
+  `ALTER TABLE items ADD COLUMN code TEXT NOT NULL DEFAULT '';`,
+
+  // v8: backfill codes for existing rows
+  `UPDATE items SET code = (
+     SELECT printf('%04d', rn) FROM (
+       SELECT id, row_number() OVER (ORDER BY name COLLATE NOCASE, id) AS rn
+       FROM items WHERE code = ''
+     ) WHERE id = items.id
+   ) WHERE code = '';`,
 ];

@@ -201,7 +201,7 @@ const handlers: Record<string, (args: Json) => string> = {
     const walk = (children: Item[], depth: number) => {
       for (const c of children) {
         lines.push(
-          `${'  '.repeat(depth)}${c.name}${c.quantity > 1 ? ` x${c.quantity}` : ''}${
+          `${'  '.repeat(depth)}${c.code ? `[${c.code}] ` : ''}${c.name}${c.quantity > 1 ? ` x${c.quantity}` : ''}${
             c.category ? `  [${c.category}]` : ''
           }`,
         );

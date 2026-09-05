@@ -52,7 +52,9 @@ export function ItemTreeView(props: {
           ) : (
             <span class="twisty twisty--leaf" />
           )}
-          <span class="tree-name">{item.name}</span>
+          <span class="tree-name">
+            {item.code ? <span class="tree-code">[{item.code}]</span> : null} {item.name}
+          </span>
           <span class="tree-meta">
             {item.category ? `${item.category}` : ''}
             {item.quantity > 1 ? ` ×${item.quantity}` : ''}

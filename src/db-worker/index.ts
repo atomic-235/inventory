@@ -58,6 +58,15 @@ async function resolveLookup(table: LookupTable, name: string): Promise<number |
   return Number(rows[0][0]);
 }
 
+async function nextCode(): Promise<string> {
+  const { rows } = await sqlite3.execWithParams(
+    db,
+    `SELECT MAX(CAST(code AS INTEGER)) FROM items WHERE code != ''`,
+  );
+  const m = Number(rows[0]?.[0] ?? 0);
+  return String((Number.isFinite(m) ? m : 0) + 1).padStart(4, '0');
+}
+
 function lookupRowsToLookups(rows: unknown[][]): Lookup[] {
   return rows.map((row) => ({ id: Number(row[0]), name: String(row[1]) }));
 }
@@ -67,6 +76,7 @@ function itemsSql(includeDeleted: boolean): string {
   return `SELECT
     items.id AS id,
     items.name AS name,
+    items.code AS code,
     COALESCE(categories.name, '') AS category,
     items.quantity AS quantity,
     COALESCE(units.name, '') AS unit,
@@ -156,13 +166,14 @@ async function handle(request: Request): Promise<void> {
           const categoryId = await resolveLookup('categories', item.category);
           const unitId = await resolveLookup('units', item.unit);
           const conditionId = await resolveLookup('conditions', item.condition);
+          const code = item.code || (await nextCode());
           await sqlite3.run(
             db,
             `INSERT INTO items
-              (id, name, category_id, quantity, unit_id, purchase_date, purchase_price, condition_id, notes, parent_id, updated_at, deleted_at)
-              VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`,
+              (id, name, code, category_id, quantity, unit_id, purchase_date, purchase_price, condition_id, notes, parent_id, updated_at, deleted_at)
+              VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`,
             [
-              item.id, item.name, categoryId, item.quantity, unitId,
+              item.id, item.name, code, categoryId, item.quantity, unitId,
               item.purchase_date, item.purchase_price, conditionId, item.notes, item.parent_id,
               item.updated_at, item.deleted_at,
             ],
@@ -177,13 +188,14 @@ async function handle(request: Request): Promise<void> {
         const categoryId = await resolveLookup('categories', item.category);
         const unitId = await resolveLookup('units', item.unit);
         const conditionId = await resolveLookup('conditions', item.condition);
+        const code = await nextCode();
         await sqlite3.run(
           db,
           `INSERT INTO items
-            (id, name, category_id, quantity, unit_id, purchase_date, purchase_price, condition_id, notes, parent_id, updated_at)
-            VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`,
+            (id, name, code, category_id, quantity, unit_id, purchase_date, purchase_price, condition_id, notes, parent_id, updated_at)
+            VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`,
           [
-            item.id, item.name, categoryId, item.quantity, unitId,
+            item.id, item.name, code, categoryId, item.quantity, unitId,
             item.purchase_date, item.purchase_price, conditionId, item.notes, item.parent_id, Date.now(),
           ],
         );

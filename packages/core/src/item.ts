@@ -3,6 +3,7 @@ import { z } from 'zod';
 export const ItemSchema = z.object({
   id: z.string(),
   name: z.string().min(1),
+  code: z.string().default(''),
   category: z.string().default(''),
   quantity: z.coerce.number().int().positive().default(1),
   unit: z.string().default(''),

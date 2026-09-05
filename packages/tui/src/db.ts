@@ -79,6 +79,13 @@ const MIGRATIONS: string[] = [
   `ALTER TABLE items ADD COLUMN updated_at INTEGER NOT NULL DEFAULT 0;
    ALTER TABLE items ADD COLUMN deleted_at INTEGER;
    UPDATE items SET updated_at = ${Date.now()} WHERE updated_at = 0;`,
+  `ALTER TABLE items ADD COLUMN code TEXT NOT NULL DEFAULT '';`,
+  `UPDATE items SET code = (
+     SELECT printf('%04d', rn) FROM (
+       SELECT id, row_number() OVER (ORDER BY name COLLATE NOCASE, id) AS rn
+       FROM items WHERE code = ''
+     ) WHERE id = items.id
+   ) WHERE code = '';`,
 ];
 
 const LOOKUP_COLUMN: Record<string, string> = {
@@ -92,6 +99,7 @@ function itemsSql(includeDeleted: boolean): string {
   return `SELECT
     items.id AS id,
     items.name AS name,
+    items.code AS code,
     COALESCE(categories.name, '') AS category,
     items.quantity AS quantity,
     COALESCE(units.name, '') AS unit,
@@ -134,6 +142,13 @@ export class Db {
     return row?.id ?? null;
   }
 
+  private nextCode(): string {
+    const row = this.db
+      .prepare('SELECT MAX(CAST(code AS INTEGER)) AS m FROM items')
+      .get() as { m: number | null };
+    return String((row?.m ?? 0) + 1).padStart(4, '0');
+  }
+
   listItems(): Item[] {
     return (this.db.prepare(itemsSql(false)).all() as Record<string, unknown>[]).map((r) =>
       ItemSchema.parse(r),
@@ -152,13 +167,14 @@ export class Db {
       this.db.exec('DELETE FROM items');
       const insert = this.db.prepare(
         `INSERT INTO items
-          (id, name, category_id, quantity, unit_id, purchase_date, purchase_price, condition_id, notes, parent_id, updated_at, deleted_at)
-          VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, NULL, ?, ?)`,
+          (id, name, code, category_id, quantity, unit_id, purchase_date, purchase_price, condition_id, notes, parent_id, updated_at, deleted_at)
+          VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, NULL, ?, ?)`,
       );
       for (const it of items) {
         insert.run(
           it.id,
           it.name,
+          it.code || this.nextCode(),
           this.resolveLookup('categories', it.category),
           it.quantity,
           this.resolveLookup('units', it.unit),
@@ -183,16 +199,18 @@ export class Db {
 
   insertItem(f: NewItem): void {
     const id: string = randomUUID();
+    const code = this.nextCode();
     const now = Date.now();
     this.db
       .prepare(
         `INSERT INTO items
-          (id, name, category_id, quantity, unit_id, purchase_date, purchase_price, condition_id, notes, parent_id, updated_at, deleted_at)
-          VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`,
+          (id, name, code, category_id, quantity, unit_id, purchase_date, purchase_price, condition_id, notes, parent_id, updated_at, deleted_at)
+          VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`,
       )
       .run(
         id,
         f.name,
+        code,
         this.resolveLookup('categories', f.category ?? ''),
         f.quantity ?? 1,
         this.resolveLookup('units', f.unit ?? ''),

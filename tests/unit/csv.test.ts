@@ -5,6 +5,7 @@ import type { Item } from '../../src/domain/item';
 const item: Item = {
   id: '1',
   name: 'Lamp',
+  code: '',
   parent_id: null,
   category: 'Furniture',
   quantity: 2,
