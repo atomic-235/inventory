@@ -5,12 +5,14 @@ const SYNC_KEY = 'inventory.sync';
 
 export function loadConfig(): ProviderConfig {
   const raw = localStorage.getItem(KEY);
-  if (!raw) return { baseUrl: '', apiKey: '', model: '' };
-  try {
-    return SettingsSchema.parse(JSON.parse(raw));
-  } catch {
-    return { baseUrl: '', apiKey: '', model: '' };
+  if (raw) {
+    try {
+      return SettingsSchema.parse(JSON.parse(raw));
+    } catch {
+      /* fall through to defaults */
+    }
   }
+  return SettingsSchema.parse({});
 }
 
 export function saveConfig(config: ProviderConfig): void {

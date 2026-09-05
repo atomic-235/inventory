@@ -16,6 +16,7 @@ export interface CompleteParams {
   messages: ChatMessage[];
   tools?: object[];
   stream?: boolean;
+  supportsResponseFormat?: boolean;
 }
 
 export interface AssistantMessage {
@@ -42,26 +43,52 @@ export async function complete(params: CompleteParams): Promise<AssistantMessage
   return msg as AssistantMessage;
 }
 
+function parseJsonContent<T>(schema: z.ZodType<T>, content: string): T {
+  let text = content.trim();
+  const fence = text.match(/```(?:json)?\s*([\s\S]*?)```/);
+  if (fence) text = fence[1].trim();
+  const start = text.indexOf('{');
+  const end = text.lastIndexOf('}');
+  if (start >= 0 && end > start) text = text.slice(start, end + 1);
+  return schema.parse(JSON.parse(text));
+}
+
+function messageContent(data: any): string {
+  const content = data.choices?.[0]?.message?.content;
+  if (typeof content !== 'string') throw new Error('LLM response missing content');
+  return content;
+}
+
 export async function structuredJson<T>(
   schema: z.ZodType<T>,
   params: CompleteParams & { responseFormatName?: string },
 ): Promise<T> {
-  const jsonSchema = z.toJSONSchema(schema);
+  const messages: ChatMessage[] = params.supportsResponseFormat
+    ? params.messages
+    : [
+        ...params.messages,
+        {
+          role: 'system',
+          content: 'Respond with a single JSON object and nothing else. Do not wrap it in markdown code fences.',
+        },
+      ];
 
   const body: Record<string, unknown> = {
     model: params.model,
-    messages: params.messages,
-    response_format: {
-      type: 'json_schema',
-      json_schema: { name: params.responseFormatName ?? 'response', schema: jsonSchema },
-    },
+    messages,
   };
+  if (params.supportsResponseFormat) {
+    body.response_format = {
+      type: 'json_schema',
+      json_schema: {
+        name: params.responseFormatName ?? 'response',
+        schema: z.toJSONSchema(schema),
+      },
+    };
+  }
 
   const data = await postJson(params, body);
-  const content = data.choices?.[0]?.message?.content;
-  if (typeof content !== 'string') throw new Error('LLM response missing content');
-
-  return schema.parse(JSON.parse(content));
+  return parseJsonContent(schema, messageContent(data));
 }
 
 async function postJson(params: CompleteParams, body: Record<string, unknown>): Promise<any> {

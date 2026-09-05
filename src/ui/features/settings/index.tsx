@@ -19,6 +19,7 @@ export default function Settings() {
   const [baseUrl, setBaseUrl] = useState('');
   const [apiKey, setApiKey] = useState('');
   const [model, setModel] = useState('');
+  const [supportsResponseFormat, setSupportsResponseFormat] = useState(false);
   const [status, setStatus] = useState('');
 
   const [sync, setSync] = useState<SyncState>(emptySync());
@@ -29,12 +30,13 @@ export default function Settings() {
     setBaseUrl(cfg.baseUrl);
     setApiKey(cfg.apiKey);
     setModel(cfg.model);
+    setSupportsResponseFormat(cfg.supportsResponseFormat);
     setSync(loadSyncConfig());
   }, []);
 
   const onSubmit = async (e: Event) => {
     e.preventDefault();
-    const cfg = { baseUrl, apiKey, model };
+    const cfg = { baseUrl, apiKey, model, supportsResponseFormat };
     saveConfig(cfg);
     try {
       await db.saveSettings(cfg);
@@ -70,6 +72,17 @@ export default function Settings() {
         <div>
           <label htmlFor="model">Model</label>
           <input id="model" type="text" value={model} onInput={(e) => setModel(e.currentTarget.value)} />
+        </div>
+        <div>
+          <label htmlFor="supports-response-format">
+            <input
+              id="supports-response-format"
+              type="checkbox"
+              checked={supportsResponseFormat}
+              onChange={(e) => setSupportsResponseFormat(e.currentTarget.checked)}
+            />{' '}
+            Model supports response_format (json_schema)
+          </label>
         </div>
         <button type="submit">Save</button>
       </form>

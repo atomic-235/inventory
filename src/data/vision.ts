@@ -41,6 +41,7 @@ export async function extractItem(
         model: cfg.model,
         messages,
         responseFormatName: 'item',
+        supportsResponseFormat: cfg.supportsResponseFormat,
       });
     } catch (err) {
       lastError = err instanceof Error ? err.message : String(err);
